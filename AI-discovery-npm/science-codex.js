@@ -13,8 +13,74 @@ const DEFAULT_MODEL = "gpt-5.5";
 const DEFAULT_OUTPUT_DIR = "ai_discovery_runs";
 const DEFAULT_TIMEOUT_MS = 120000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 6000;
+const DEFAULT_SAFETY_LEVEL = 3;
 const WEB_SEARCH_TOOL = { type: "web_search" };
 const FOCUSED_MODE_COMMANDS = new Set(["/hypothesis", "/experiment", "/writer"]);
+
+const SAFETY_LEVELS = new Map([
+  [
+    1,
+    {
+      label: "lowest bio/chemical risk",
+      warning: "Standard scientific caution. Keep provenance clear and avoid unsupported operational claims.",
+      prompt:
+        "Treat the topic as low biological or chemical risk. Use normal scientific quality controls, cite provenance, and avoid speculative procedural detail.",
+    },
+  ],
+  [
+    2,
+    {
+      label: "low bio/chemical risk",
+      warning: "Add basic misuse checks and source-quality cautions for biological or chemical claims.",
+      prompt:
+        "Treat the topic as low biological or chemical risk. Include basic misuse checks, source-quality notes, and safe alternatives when details could become operational.",
+    },
+  ],
+  [
+    3,
+    {
+      label: "moderate bio/chemical risk",
+      warning: "Use non-operational framing for lab-relevant details and call out review requirements.",
+      prompt:
+        "Treat the topic as moderate biological or chemical risk. Keep lab-relevant details non-operational unless they are benign, add review requirements, and separate safe conceptual discussion from executable protocols.",
+    },
+  ],
+  [
+    4,
+    {
+      label: "high bio/chemical risk",
+      warning: "Strong warning. Avoid actionable synthesis, culturing, optimization, dosing, scale-up, or release guidance.",
+      prompt:
+        "Treat the topic as high biological or chemical risk. Provide a strong warning, avoid actionable synthesis, culturing, optimization, dosing, scale-up, release, evasion, or harm-enabling instructions, and redirect to safety, ethics, compliance, and high-level risk analysis.",
+    },
+  ],
+  [
+    5,
+    {
+      label: "highest bio/chemical risk",
+      warning: "Highest warning. Do not lower safeguards; keep content non-operational and compliance-focused.",
+      prompt:
+        "Treat the topic as highest biological or chemical risk. Give a prominent warning. Do not lower safeguards or provide hazardous operational steps. Keep the response non-operational, compliance-focused, and oriented around risk assessment, oversight, safer substitutes, incident prevention, and legitimate review channels.",
+    },
+  ],
+]);
+
+const SCIENTIFIC_TRANSPARENCY_REQUIREMENTS = [
+  "Scientific transparency requirements for /research, /hypothesis, and /writer:",
+  "- Expose uncertainty explicitly by labeling confidence, missing information, assumptions, and unknowns.",
+  "- Present plausible alternatives, counterarguments, and concise debate between competing interpretations when useful.",
+  "- State provenance for evidence, data, assumptions, retrieved sources, generated code, synthetic data, and model-produced content.",
+  "- Distinguish direct evidence, inference, speculation, and planned validation.",
+  "- Identify what observations, sources, or tests would resolve the debate.",
+  "- Do not reveal private chain-of-thought; provide concise public reasoning and audit notes only.",
+].join("\n");
+
+const HYPOTHESIS_EVIDENCE_AUDIT_REQUIREMENTS = [
+  "Hypothesis-mode evidence requirements:",
+  "- Include claim-level evidence audits for selected hypotheses: claim, evidence/provenance, support strength, uncertainty, and needed validation.",
+  "- Include novelty checks against prior literature when sources are available; if search is unavailable, label novelty as unverified.",
+  "- Include prospective tests for selected hypotheses, with falsifying observations, measurements, controls, and next evidence to collect.",
+].join("\n");
 
 const COMMANDS = new Map([
   [
@@ -43,6 +109,13 @@ const COMMANDS = new Map([
     {
       purpose: "Show or change the active model for all science agents.",
       usage: "/model [model-name]",
+    },
+  ],
+  [
+    "/safety",
+    {
+      purpose: "Show or change the bio/chemical risk safety level used by science agents.",
+      usage: "/safety [1-5]",
     },
   ],
   [
@@ -122,6 +195,7 @@ const COMMAND_ALIASES = new Map([
   ["status", "/status"],
   ["verbose", "/verbose"],
   ["model", "/model"],
+  ["safety", "/safety"],
   ["new", "/new"],
   ["clear", "/clear"],
   ["history", "/history"],
@@ -141,6 +215,7 @@ const SCIENCE_SYSTEM_PROMPT = [
   "Operate as a rigorous scientific collaborator: define research plans, search-informed literature reviews, testable hypotheses, experiment designs, reproducible analysis scaffolds, technical reviews, and final research papers.",
   "Never invent citations, measurements, datasets, or executed results. Label assumptions, synthetic data, and limitations.",
   "Treat generated code as untrusted until reviewed and run by the user. Do not claim it was executed unless execution evidence is provided.",
+  SCIENTIFIC_TRANSPARENCY_REQUIREMENTS,
   "Use concise Markdown with the exact requested headings.",
 ].join("\n");
 
@@ -158,6 +233,7 @@ const PLAN_PROMPT = [
   "Requirements:",
   "- Make the plan specific enough to drive literature review, hypothesis generation, experiment design, experiment running, analysis, paper drafting, technical review, and final LaTeX paper output.",
   "- Identify actors, data assumptions, operational constraints, and validation points.",
+  "- In the risks and constraints section, expose uncertainty, alternatives, provenance gaps, counterarguments, and debate points that the workflow should resolve.",
   "- Do not claim any experiment or literature search has already happened.",
 ].join("\n");
 
@@ -193,7 +269,11 @@ const HYPOTHESIS_PROMPT = [
   "- The null hypothesis must be the precise statistical complement.",
   "- Include 3 to 6 measurable predictions with IV, DV, population/system, expected effect, metric, statistical test, formal H0/H1, and power/sample-size note.",
   "- State assumptions, alternative explanations, threats to inference, and citation limits.",
+  "- Include claim-level evidence audits, novelty checks against prior literature, and prospective tests for selected hypotheses.",
+  "- Surface uncertainty, provenance, counterarguments, and concise debate without adding extra top-level headings.",
   "- Do not fabricate sources. If no retrieved sources are supplied, label literature claims as assumption-based or lower-confidence.",
+  "",
+  HYPOTHESIS_EVIDENCE_AUDIT_REQUIREMENTS,
 ].join("\n");
 
 const EXPERIMENT_PROMPT = [
@@ -253,6 +333,7 @@ const DRAFT_PAPER_PROMPT = [
   "Requirements:",
   "- Use the requested final paper format exactly: abstract, introduction, hypothesis, experiment, data, results, conclusion, references.",
   "- Distinguish executed, synthetic, planned, and assumption-based material.",
+  "- Expose uncertainty, alternatives, provenance, and counterarguments in the existing sections without inventing evidence.",
   "- Use only supplied or retrieved references. Do not invent citations.",
 ].join("\n");
 
@@ -292,6 +373,7 @@ const FINAL_PAPER_PROMPT = [
   "- Apply the technical review's required revisions when they are supported by the supplied artifacts.",
   "- Do not invent citations, data, experiments, or measurements.",
   "- Clearly label synthetic experiment-run output and assumption-based conclusions.",
+  "- Preserve uncertainty, alternatives, provenance notes, and counterarguments in the existing paper sections.",
 ].join("\n");
 
 const WRITER_PROMPT = [
@@ -313,6 +395,7 @@ const WRITER_PROMPT = [
   "- Do not claim generated experiment code was executed unless execution output is supplied.",
   "- Do not invent citations. Use a References section that includes only supplied or retrieved sources.",
   "- Clearly label synthetic data, planned analysis, and non-empirical material.",
+  "- Expose uncertainty, alternatives, provenance, counterarguments, and concise debate in the existing final-paper sections.",
 ].join("\n");
 
 function normalizeCommand(command) {
@@ -360,6 +443,58 @@ function parseCommandLine(line) {
   };
 }
 
+function normalizeSafetyLevel(value) {
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5) {
+    return DEFAULT_SAFETY_LEVEL;
+  }
+  return parsed;
+}
+
+function parseSafetyLevelInput(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  const match = /^(?:level\s*)?([1-5])$/.exec(raw);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]);
+}
+
+function safetyProfile(level) {
+  return SAFETY_LEVELS.get(normalizeSafetyLevel(level)) || SAFETY_LEVELS.get(DEFAULT_SAFETY_LEVEL);
+}
+
+function formatSafetyProfile(level) {
+  const normalized = normalizeSafetyLevel(level);
+  const profile = safetyProfile(normalized);
+  return [
+    `Bio/chemical safety level: ${normalized} (${profile.label}).`,
+    `Warning: ${profile.warning}`,
+    "This setting calibrates warning and review posture only. It does not bypass scientific, legal, or safety boundaries.",
+  ].join("\n");
+}
+
+function buildSystemPrompt(safetyLevel) {
+  const profile = safetyProfile(safetyLevel);
+  return [
+    SCIENCE_SYSTEM_PROMPT,
+    "",
+    "Bio/chemical safety profile:",
+    profile.prompt,
+    "Never reduce safeguards for hazardous biological or chemical content. Prefer safe, high-level, non-operational risk analysis when details could enable harm.",
+  ].join("\n");
+}
+
+function appendRuntimeGovernance(userPrompt, safetyLevel) {
+  return [
+    String(userPrompt || "").trim(),
+    "",
+    SCIENTIFIC_TRANSPARENCY_REQUIREMENTS,
+    "",
+    formatSafetyProfile(safetyLevel),
+  ].join("\n");
+}
+
 function parseGlobalArgs(argv) {
   const options = {
     model: process.env.AI_DISCOVERY_MODEL || DEFAULT_MODEL,
@@ -367,6 +502,7 @@ function parseGlobalArgs(argv) {
     dryRun: process.env.SCIENCE_CODEX_DRY_RUN === "1",
     webSearch: process.env.AI_DISCOVERY_DISABLE_WEB_SEARCH !== "1",
     verbose: process.env.SCIENCE_CODEX_VERBOSE === "1" || process.env.AI_DISCOVERY_VERBOSE === "1",
+    safetyLevel: normalizeSafetyLevel(process.env.AI_DISCOVERY_SAFETY_LEVEL || DEFAULT_SAFETY_LEVEL),
     maxOutputTokens: Number(process.env.AI_DISCOVERY_MAX_OUTPUT_TOKENS || DEFAULT_MAX_OUTPUT_TOKENS),
     commandLine: "",
     help: false,
@@ -402,6 +538,19 @@ function parseGlobalArgs(argv) {
     }
     if (arg.startsWith("--model=")) {
       options.model = arg.slice("--model=".length) || options.model;
+      continue;
+    }
+    if (arg === "--safety-level" || arg === "--safety") {
+      i += 1;
+      options.safetyLevel = normalizeSafetyLevel(argv[i] || options.safetyLevel);
+      continue;
+    }
+    if (arg.startsWith("--safety-level=")) {
+      options.safetyLevel = normalizeSafetyLevel(arg.slice("--safety-level=".length) || options.safetyLevel);
+      continue;
+    }
+    if (arg.startsWith("--safety=")) {
+      options.safetyLevel = normalizeSafetyLevel(arg.slice("--safety=".length) || options.safetyLevel);
       continue;
     }
     if (arg === "--output") {
@@ -448,6 +597,7 @@ function formatHelp() {
     "  npm start -- \"Can intervention X improve outcome Y?\"",
     "  npm start -- /research \"Can intervention X improve outcome Y?\"",
     "  npm start -- /hypothesis \"Can intervention X improve outcome Y?\"",
+    "  npm start -- --safety-level 4 /research \"Assess risks and safeguards for a lab-adjacent study\"",
     "  npm start -- --verbose /research \"Can intervention X improve outcome Y?\"",
     "  npm start -- --dry-run /experiment \"Test a new catalyst for CO2 reduction\"",
     "",
@@ -455,6 +605,7 @@ function formatHelp() {
     "Focused modes: /hypothesis, /experiment, and /writer keep follow-up text in that mode for expand/change/rewrite work.",
     "Use /exit to leave a focused mode. Use /quit to close the CLI.",
     "Use /verbose to toggle live streamed AI output in API mode.",
+    "Use /safety 1-5 to set the bio/chemical risk warning level. Level 5 is highest risk and does not lower safeguards.",
     "",
     "API mode uses OPENAI_API_KEY. Without it, the CLI automatically uses deterministic dry-run output.",
     "The literature stage uses hosted web search in API mode unless --no-web-search or AI_DISCOVERY_DISABLE_WEB_SEARCH=1 is set.",
@@ -965,7 +1116,7 @@ function buildWriterFollowupUserPrompt(state, instruction) {
   ].join("\n");
 }
 
-function buildDryRunResearchPlan(question) {
+function buildDryRunResearchPlan(question, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   return [
     "## Problem Statement",
     `The research question is: ${question}. The immediate problem is to convert this broad prompt into a testable research workflow without overclaiming evidence that has not been retrieved or measured.`,
@@ -982,6 +1133,7 @@ function buildDryRunResearchPlan(question) {
     "- The hypothesis is falsifiable and paired with a null hypothesis.",
     "- The experiment defines variables, controls, metrics, sample-size assumptions, and failure handling.",
     "- The paper uses the requested sections: abstract, introduction, hypothesis, experiment, data, results, conclusion, references.",
+    "- Research, hypothesis, and writer artifacts expose uncertainty, alternatives, provenance, counterarguments, and debate points.",
     "",
     "## Research Workflow",
     "1. Build the research plan.",
@@ -999,10 +1151,11 @@ function buildDryRunResearchPlan(question) {
     "- Synthetic pilot output is not empirical evidence.",
     "- Generated code and LaTeX are saved for review and are not executed automatically.",
     "- User prompts and model output are treated as untrusted content.",
+    `- ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
   ].join("\n");
 }
 
-function buildDryRunLiteratureReview(question) {
+function buildDryRunLiteratureReview(question, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   return [
     "## Search Strategy",
     "Dry-run mode did not call hosted web search. In live API mode, this stage asks the Responses API to use hosted web search for peer-reviewed papers, official datasets, and authoritative technical sources relevant to the research question.",
@@ -1017,18 +1170,20 @@ function buildDryRunLiteratureReview(question) {
     "| Measurement method | Assumption-based | Retrieve validated measurement protocols |",
     "| Expected effect size | Unknown | Use pilot data or meta-analysis |",
     "| Confounders and bias | Assumption-based | Review study-design literature |",
+    "| Provenance and counterarguments | Not retrieved in dry-run mode | Compare primary sources and explicitly record disagreements |",
     "",
     "## Gaps and Assumptions",
     "- No external sources were retrieved in dry-run mode.",
     "- Claims must be treated as low-confidence until live search or user-supplied sources are reviewed.",
     "- The later hypothesis and experiment should avoid source-specific claims unless references are added.",
+    `- ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
     "",
     "## References",
     "- No retrieved references in dry-run mode.",
   ].join("\n");
 }
 
-function buildDryRunHypothesis(question) {
+function buildDryRunHypothesis(question, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   const framedQuestion = `For the research question "${question}"`;
   return [
     "## Primary Hypothesis",
@@ -1071,7 +1226,12 @@ function buildDryRunHypothesis(question) {
     "- Assumptions: the question can be mapped to a measurable intervention/exposure, comparator, outcome, and target population.",
     "- Alternative explanation 1: selection bias could create baseline differences rather than a true condition effect.",
     "- Alternative explanation 2: measurement reactivity could change outcomes in both groups and obscure a condition-specific effect.",
+    "- Counterargument / debate: the primary claim remains contestable until baseline balance, measurement validity, and source provenance are checked against plausible null or artifact explanations.",
+    "- Claim-level evidence audit: the primary hypothesis is assumption-based in dry-run mode; no retrieved source, empirical dataset, or executed experiment currently confirms it.",
+    "- Novelty check against prior literature: unverified in dry-run mode because no literature search was performed; live mode should compare the selected hypothesis against recent reviews, registered studies, and close variants.",
+    "- Prospective tests of selected hypotheses: preregister the primary endpoint, run the controlled comparison, include a negative-control outcome, and treat failure to observe the predicted direction or a specific-falsification pattern as evidence against the hypothesis.",
     "- Literature retrieval was not performed in dry-run mode; evidence claims should be treated as lower-confidence until sources are reviewed.",
+    `- ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
   ].join("\n");
 }
 
@@ -1145,7 +1305,7 @@ console.log(JSON.stringify({
 `;
 }
 
-function buildDryRunExperiment(question, hypothesis) {
+function buildDryRunExperiment(question, hypothesis, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   const code = buildExperimentCode(question);
   return {
     design: [
@@ -1185,6 +1345,7 @@ function buildDryRunExperiment(question, hypothesis) {
       "",
       "## Ethical and Practical Considerations",
       "Document consent, risk controls, data minimization, retention, and review requirements. Treat all generated code and synthetic findings as untrusted until reviewed.",
+      `Safety profile: ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
       "",
       "## Generated Experiment Code",
       "```javascript",
@@ -1261,7 +1422,7 @@ function buildExperimentRunMarkdown(runOutput) {
   ].join("\n");
 }
 
-function buildDryRunAnalysis(question, hypothesis, experimentRun) {
+function buildDryRunAnalysis(question, hypothesis, experimentRun, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   const parsedRun = typeof experimentRun === "string" ? experimentRun : JSON.stringify(experimentRun, null, 2);
   return [
     "## Data",
@@ -1280,6 +1441,8 @@ function buildDryRunAnalysis(question, hypothesis, experimentRun) {
     "- No real data were collected.",
     "- No live model or web search was used in dry-run mode.",
     "- The effect size and data distribution are assumptions.",
+    "- Alternative explanations and counterarguments remain unresolved until real data, provenance checks, and preregistered tests are available.",
+    `- ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
     "",
     "## Reproducibility Notes",
     `Research question: ${question || "[missing]"}`,
@@ -1291,7 +1454,15 @@ function buildDryRunAnalysis(question, hypothesis, experimentRun) {
   ].join("\n");
 }
 
-function buildDryRunFinalPaper(question, hypothesis, experimentDesign, experimentRun, analysis, literatureReview) {
+function buildDryRunFinalPaper(
+  question,
+  hypothesis,
+  experimentDesign,
+  experimentRun,
+  analysis,
+  literatureReview,
+  safetyLevel = DEFAULT_SAFETY_LEVEL,
+) {
   return [
     "# Title",
     `AI Discovery Research Paper: ${question || "Untitled Research Question"}`,
@@ -1301,6 +1472,7 @@ function buildDryRunFinalPaper(question, hypothesis, experimentDesign, experimen
     "",
     "## Introduction",
     `The research question is: ${question || "[missing]"}. The workflow is designed to make the question testable while separating retrieved evidence, assumptions, planned methods, and synthetic pilot output.`,
+    "Uncertainty, provenance, alternatives, and counterarguments are treated as first-class review items rather than hidden caveats.",
     "",
     "## Hypothesis",
     hypothesis ? truncate(hypothesis, 1400) : "No hypothesis artifact was available.",
@@ -1320,6 +1492,7 @@ function buildDryRunFinalPaper(question, hypothesis, experimentDesign, experimen
     "",
     "## Conclusion",
     "The workflow produced a reviewable first-pass research package and final paper artifact. Scientific conclusions remain deferred until literature sources are retrieved, empirical data are collected, and the generated analysis code is reviewed and run in a controlled environment.",
+    `Safety and debate note: ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
     "",
     "## References",
     literatureReview && /https?:\/\//.test(literatureReview)
@@ -1328,7 +1501,7 @@ function buildDryRunFinalPaper(question, hypothesis, experimentDesign, experimen
   ].join("\n");
 }
 
-function buildDryRunTechnicalReview(draftPaper) {
+function buildDryRunTechnicalReview(draftPaper, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   return [
     "## Summary",
     "The draft is structurally complete for the requested final paper format, but dry-run evidence remains assumption-bound.",
@@ -1343,10 +1516,12 @@ function buildDryRunTechnicalReview(draftPaper) {
     "",
     "## Citation and Evidence Review",
     "- Dry-run mode has no retrieved sources; all literature claims must be labeled as assumptions.",
+    "- Claim-level evidence audits, novelty checks, provenance notes, and counterarguments must remain visible in the final artifact.",
     "",
     "## Security and Reproducibility Review",
     "- The CLI writes local artifacts only and does not execute generated code.",
     "- The synthetic runner is deterministic and records the seed.",
+    `- ${formatSafetyProfile(safetyLevel).replace(/\n/g, " ")}`,
     "",
     "## Required Revisions",
     draftPaper && draftPaper.includes("## References")
@@ -1355,9 +1530,18 @@ function buildDryRunTechnicalReview(draftPaper) {
   ].join("\n");
 }
 
-function buildDryRunPaper(question, hypothesis, experimentDesign, experimentCode, experimentRun = "", analysis = "", literatureReview = "") {
+function buildDryRunPaper(
+  question,
+  hypothesis,
+  experimentDesign,
+  experimentCode,
+  experimentRun = "",
+  analysis = "",
+  literatureReview = "",
+  safetyLevel = DEFAULT_SAFETY_LEVEL,
+) {
   return [
-    buildDryRunFinalPaper(question, hypothesis, experimentDesign, experimentRun, analysis, literatureReview),
+    buildDryRunFinalPaper(question, hypothesis, experimentDesign, experimentRun, analysis, literatureReview, safetyLevel),
     "",
     "<!-- Generated experiment code excerpt -->",
     "```javascript",
@@ -1367,7 +1551,7 @@ function buildDryRunPaper(question, hypothesis, experimentDesign, experimentCode
 }
 
 function buildDryRunHypothesisFollowup(state, instruction) {
-  const base = state.hypothesis || buildDryRunHypothesis(state.activeQuestion || instruction);
+  const base = state.hypothesis || buildDryRunHypothesis(state.activeQuestion || instruction, state.safetyLevel);
   return [
     base.trim(),
     "",
@@ -1380,7 +1564,7 @@ function buildDryRunHypothesisFollowup(state, instruction) {
 
 function buildDryRunExperimentFollowup(state, instruction) {
   const question = state.activeQuestion || instruction;
-  const base = buildDryRunExperiment(question, state.hypothesis).design;
+  const base = buildDryRunExperiment(question, state.hypothesis, state.safetyLevel).design;
   return [
     base.trim(),
     "",
@@ -1401,6 +1585,7 @@ function buildDryRunWriterFollowup(state, instruction) {
       state.experimentRun,
       state.dataAnalysis,
       state.literatureReview,
+      state.safetyLevel,
     ).trim(),
     "",
     "<!-- Writer mode follow-up applied:",
@@ -1471,6 +1656,7 @@ class ScienceCodexCli {
       activeQuestion: "",
       webSearch: options.webSearch !== false,
       verbose: Boolean(options.verbose),
+      safetyLevel: normalizeSafetyLevel(options.safetyLevel ?? process.env.AI_DISCOVERY_SAFETY_LEVEL ?? DEFAULT_SAFETY_LEVEL),
       researchPlan: "",
       literatureReview: "",
       hypothesis: "",
@@ -1522,6 +1708,8 @@ class ScienceCodexCli {
       version: APP_VERSION,
       model: this.state.model,
       dryRun: this.state.dryRun,
+      safetyLevel: this.state.safetyLevel,
+      safetyProfile: safetyProfile(this.state.safetyLevel).label,
       activeMode: this.state.activeMode,
       activeQuestion: this.state.activeQuestion,
       artifacts: {
@@ -1571,6 +1759,7 @@ class ScienceCodexCli {
       `Mode: ${this.state.dryRun ? "dry-run" : "OpenAI Responses API"}`,
       `Web search: ${this.state.webSearch ? "enabled for literature stage" : "disabled"}`,
       `Verbose streaming output: ${this.state.verbose ? "on" : "off"}`,
+      `Bio/chemical safety level: ${this.state.safetyLevel} - ${safetyProfile(this.state.safetyLevel).label}`,
       `Output directory: ${this.state.outputDir}`,
       `Session directory: ${this.state.sessionDir || "[not created yet]"}`,
       `Active focused mode: ${this.state.activeMode || "[none]"}`,
@@ -1614,13 +1803,15 @@ class ScienceCodexCli {
       source,
       visibleStreamed,
     });
+    const systemPrompt = buildSystemPrompt(this.state.safetyLevel);
+    const governedUserPrompt = appendRuntimeGovernance(userPrompt, this.state.safetyLevel);
     const invokeResponsesApi = async (requestOptions = {}) => {
       try {
         return await callResponsesApi({
           apiKey: this.apiKey,
           model: this.state.model,
-          systemPrompt: SCIENCE_SYSTEM_PROMPT,
-          userPrompt,
+          systemPrompt,
+          userPrompt: governedUserPrompt,
           maxOutputTokens: this.maxOutputTokens,
           timeoutMs: this.timeoutMs,
           stream: true,
@@ -1675,6 +1866,19 @@ class ScienceCodexCli {
       return "Verbose streaming output: off.";
     }
     return "Usage: /verbose [on|off]";
+  }
+
+  handleSafety(args) {
+    const value = String(args || "").trim();
+    if (!value) {
+      return formatSafetyProfile(this.state.safetyLevel);
+    }
+    const parsed = parseSafetyLevelInput(value);
+    if (!parsed) {
+      return "Usage: /safety [1-5]";
+    }
+    this.state.safetyLevel = parsed;
+    return `Bio/chemical safety level set to ${parsed} - ${safetyProfile(parsed).label}.\n${safetyProfile(parsed).warning}`;
   }
 
   async runWorkflowStage(label, action) {
@@ -1741,7 +1945,7 @@ class ScienceCodexCli {
     const result = await this.generateWithModel(
       "Hypothesis",
       buildHypothesisUserPrompt(question),
-      () => buildDryRunHypothesis(question),
+      () => buildDryRunHypothesis(question, this.state.safetyLevel),
     );
     this.state.hypothesis = result.text;
     this.enterFocusedMode("/hypothesis");
@@ -1787,7 +1991,7 @@ class ScienceCodexCli {
     const plan = await this.runWorkflowStage("Plan", () => this.generateWithModel(
       "Plan",
       buildPlanUserPrompt(question),
-      () => buildDryRunResearchPlan(question),
+      () => buildDryRunResearchPlan(question, this.state.safetyLevel),
     ));
     this.state.researchPlan = plan.text;
     outputFiles.plan = await this.writeArtifact("01_research_plan.md", plan.text);
@@ -1803,7 +2007,7 @@ class ScienceCodexCli {
     const literature = await this.runWorkflowStage("Literature Review", () => this.generateWithModel(
       "Literature Review",
       buildLiteratureReviewUserPrompt(this.state),
-      () => buildDryRunLiteratureReview(question),
+      () => buildDryRunLiteratureReview(question, this.state.safetyLevel),
       literatureOptions,
     ));
     this.state.literatureReview = literature.text;
@@ -1812,7 +2016,7 @@ class ScienceCodexCli {
     const hypothesis = await this.runWorkflowStage("Hypothesis", () => this.generateWithModel(
       "Hypothesis",
       buildPipelineHypothesisUserPrompt(this.state),
-      () => buildDryRunHypothesis(question),
+      () => buildDryRunHypothesis(question, this.state.safetyLevel),
     ));
     this.state.hypothesis = hypothesis.text;
     outputFiles.hypothesis = await this.writeArtifact("03_hypothesis.md", hypothesis.text);
@@ -1820,7 +2024,7 @@ class ScienceCodexCli {
     const experiment = await this.runWorkflowStage("Experiment", () => this.generateWithModel(
       "Experiment",
       buildExperimentUserPrompt(this.state, question),
-      () => buildDryRunExperiment(question, this.state.hypothesis).design,
+      () => buildDryRunExperiment(question, this.state.hypothesis, this.state.safetyLevel).design,
     ));
     const generatedCode = buildExperimentCode(question);
     this.state.experimentDesign = experiment.text.includes("## Generated Experiment Code")
@@ -1841,7 +2045,7 @@ class ScienceCodexCli {
     const analysis = await this.runWorkflowStage("Data Analysis", () => this.generateWithModel(
       "Data Analysis",
       buildAnalysisUserPrompt(this.state),
-      () => buildDryRunAnalysis(question, this.state.hypothesis, this.state.experimentRun),
+      () => buildDryRunAnalysis(question, this.state.hypothesis, this.state.experimentRun, this.state.safetyLevel),
     ));
     this.state.dataAnalysis = analysis.text;
     outputFiles.dataAnalysis = await this.writeArtifact("07_data_analysis.md", analysis.text);
@@ -1856,6 +2060,7 @@ class ScienceCodexCli {
         this.state.experimentRun,
         this.state.dataAnalysis,
         this.state.literatureReview,
+        this.state.safetyLevel,
       ),
     ));
     this.state.draftPaper = draft.text;
@@ -1864,7 +2069,7 @@ class ScienceCodexCli {
     const technicalReview = await this.runWorkflowStage("Technical Review", () => this.generateWithModel(
       "Technical Review",
       buildTechnicalReviewUserPrompt(this.state),
-      () => buildDryRunTechnicalReview(this.state.draftPaper),
+      () => buildDryRunTechnicalReview(this.state.draftPaper, this.state.safetyLevel),
     ));
     this.state.technicalReview = technicalReview.text;
     outputFiles.technicalReview = await this.writeArtifact("09_technical_review.md", technicalReview.text);
@@ -1879,6 +2084,7 @@ class ScienceCodexCli {
         this.state.experimentRun,
         this.state.dataAnalysis,
         this.state.literatureReview,
+        this.state.safetyLevel,
       ),
     ));
     this.state.finalPaper = finalPaper.text;
@@ -1905,7 +2111,11 @@ class ScienceCodexCli {
       this.state.activeQuestion = brief;
     }
 
-    const dryRunFactory = () => buildDryRunExperiment(this.state.activeQuestion, this.state.hypothesis).design;
+    const dryRunFactory = () => buildDryRunExperiment(
+      this.state.activeQuestion,
+      this.state.hypothesis,
+      this.state.safetyLevel,
+    ).design;
     const result = await this.generateWithModel(
       "Experiment",
       buildExperimentUserPrompt(this.state, brief),
@@ -1991,6 +2201,10 @@ class ScienceCodexCli {
         this.state.hypothesis,
         this.state.experimentDesign,
         this.state.experimentCode,
+        this.state.experimentRun,
+        this.state.dataAnalysis,
+        this.state.literatureReview,
+        this.state.safetyLevel,
       ),
     );
     this.state.paper = result.text;
@@ -2057,6 +2271,8 @@ class ScienceCodexCli {
         }
         this.state.model = args.trim();
         return `Model set to: ${this.state.model}`;
+      case "/safety":
+        return this.handleSafety(args);
       case "/output":
         if (!args) {
           return `Output directory: ${this.state.outputDir}`;
@@ -2102,7 +2318,7 @@ class ScienceCodexCli {
   }
 
   async startInteractive() {
-    this.output(formatBanner(this.state.dryRun));
+    this.output(formatBanner(this.state.dryRun, this.state.safetyLevel));
     const rl = readline.createInterface({
       input,
       output,
@@ -2132,13 +2348,14 @@ class ScienceCodexCli {
   }
 }
 
-function formatBanner(dryRun) {
+function formatBanner(dryRun, safetyLevel = DEFAULT_SAFETY_LEVEL) {
   return [
     `${APP_NAME} v${APP_VERSION}`,
     "Science workflow: plan -> literature -> hypothesis -> experiment -> runner -> analysis -> draft -> technical review -> final paper",
     dryRun
       ? "Mode: dry-run because OPENAI_API_KEY is not set or --dry-run was passed."
       : "Mode: OpenAI Responses API.",
+    `Bio/chemical safety level: ${normalizeSafetyLevel(safetyLevel)} - ${safetyProfile(safetyLevel).label}.`,
     "Type any research question to run the full workflow, /verbose to show or hide live AI output, or /help for commands.",
   ].join("\n");
 }
@@ -2186,10 +2403,12 @@ module.exports = {
   extractResponseText,
   extractUrlCitations,
   formatHelp,
+  formatSafetyProfile,
   makePromptPayload,
   makeSyntheticExperimentRun,
   markdownToSimpleLatex,
   normalizeCommand,
+  normalizeSafetyLevel,
   parseCommandLine,
   parseGlobalArgs,
 };

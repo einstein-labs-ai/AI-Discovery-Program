@@ -8,18 +8,6 @@
 npm start
 ```
 
-## Export an API key
-For Windows:
-```
-setx OPENAI_API_KEY "your_api_key_here"
-```
-
-For Linux/MacOS: 
-```
-export OPENAI_API_KEY="your_api_key_here"
-```
-
-
 One-shot examples:
 
 ```powershell
@@ -28,6 +16,7 @@ npm start -- /research "Can a new catalyst improve CO2 reduction yield?"
 npm start -- /hypothesis "Can a new catalyst improve CO2 reduction yield?"
 npm start -- /experiment "Design a controlled catalyst screening experiment"
 npm start -- /writer "Draft a final-format paper from the current experiment"
+npm start -- --safety-level 4 /research "Assess safeguards for a lab-adjacent study"
 ```
 
 Use `OPENAI_API_KEY` for live OpenAI Responses API generation. Without `OPENAI_API_KEY`, the CLI automatically uses deterministic dry-run output so the workflow still runs locally.
@@ -50,6 +39,8 @@ ai-discovery:writer> rewrite the conclusion more carefully
 
 The live literature-review stage uses the hosted Responses API web-search tool. Disable that stage's web-search tool with `--no-web-search` or `AI_DISCOVERY_DISABLE_WEB_SEARCH=1` when the prompt contains sensitive material or when hosted search is unavailable.
 
+Use `--safety-level <1-5>`, `AI_DISCOVERY_SAFETY_LEVEL`, or `/safety <1-5>` to set the bio/chemical risk warning profile used by the science agents. Level 1 is lowest risk, and level 5 is highest risk with the strongest warning. The setting does not lower safety boundaries or permit hazardous operational guidance.
+
 ## Slash Commands
 
 - `/research <question>` runs the full workflow: plan, literature review, hypothesis, experiment, experiment runner, data analysis, draft paper, technical review, final Markdown paper, and final LaTeX paper.
@@ -58,6 +49,7 @@ The live literature-review stage uses the hosted Responses API web-search tool. 
 - `/experiment [brief]` creates an experiment design, saves runnable Node.js experiment code, runs the built-in deterministic synthetic experiment runner, saves the run output, enters experiment mode, and keeps follow-up text in that mode until `/exit`.
 - `/writer [instructions]` writes a final-format paper from the current session artifacts, saves the generated Markdown and LaTeX output, enters writer mode, and keeps follow-up text in that mode until `/exit`.
 - `/model [name]` shows or changes the model used by all science agents.
+- `/safety [1-5]` shows or changes the bio/chemical risk warning level.
 - `/status` shows model, mode, output path, artifacts, and token usage.
 - `/new` starts a fresh science session.
 - `/clear` clears the terminal view and resets visible session artifacts.
@@ -97,6 +89,8 @@ Single-stage commands also write their focused artifacts:
 - `03_research_paper.tex`
 - `session.json`
 
+Research, hypothesis, and writer outputs are instructed to expose uncertainty, alternatives, provenance, counterarguments, and concise debate. Hypothesis mode also asks for claim-level evidence audits, novelty checks against prior literature, and prospective tests for selected hypotheses.
+
 Generated experiment code is not executed automatically. The `/experiment` command and the full workflow's experiment-runner stage use deterministic synthetic data so the pipeline can proceed safely. Review generated code first, then run it in a controlled environment:
 
 ```powershell
@@ -113,6 +107,7 @@ Dry-run smoke check:
 
 ```powershell
 npm start -- --dry-run "Can a new catalyst improve CO2 reduction yield?"
+npm start -- --dry-run --safety-level 5 /hypothesis "Can a catalyst improve CO2 reduction yield?"
 npm start -- --dry-run /experiment "Design a controlled catalyst screening experiment"
 npm start -- --dry-run /writer "Draft a final-format paper from the current experiment"
 ```
