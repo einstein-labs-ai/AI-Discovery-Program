@@ -44,6 +44,8 @@ except ImportError:
 
 DEFAULT_MODEL = "gpt-5.5"
 DEFAULT_PRO_MODEL = "gpt-5.5-pro"
+APP_VERSION = "0.1"
+DEFAULT_BIO_CHEM_SAFETY_LEVEL = 3
 RECOMMENDED_MODELS = (
     DEFAULT_MODEL,
     DEFAULT_PRO_MODEL,
@@ -122,6 +124,98 @@ MODEL_ALIASES = {
     "gpt-5.2-pro": "gpt-5.2-pro",
     "gpt5.2pro": "gpt-5.2-pro",
 }
+BIO_CHEM_SAFETY_LEVELS = {
+    1: {
+        "label": "lowest bio/chemical risk",
+        "warning": (
+            "Standard scientific caution. Keep provenance clear and avoid "
+            "unsupported operational claims."
+        ),
+        "prompt": (
+            "Treat the topic as low biological or chemical risk. Use normal "
+            "scientific quality controls, cite provenance, and avoid speculative "
+            "procedural detail."
+        ),
+    },
+    2: {
+        "label": "low bio/chemical risk",
+        "warning": (
+            "Add basic misuse checks and source-quality cautions for biological "
+            "or chemical claims."
+        ),
+        "prompt": (
+            "Treat the topic as low biological or chemical risk. Include basic "
+            "misuse checks, source-quality notes, and safe alternatives when "
+            "details could become operational."
+        ),
+    },
+    3: {
+        "label": "moderate bio/chemical risk",
+        "warning": (
+            "Use non-operational framing for lab-relevant details and call out "
+            "review requirements."
+        ),
+        "prompt": (
+            "Treat the topic as moderate biological or chemical risk. Keep "
+            "lab-relevant details non-operational unless they are benign, add "
+            "review requirements, and separate safe conceptual discussion from "
+            "executable protocols."
+        ),
+    },
+    4: {
+        "label": "high bio/chemical risk",
+        "warning": (
+            "Strong warning. Avoid actionable synthesis, culturing, optimization, "
+            "dosing, scale-up, release, evasion, or harm-enabling guidance."
+        ),
+        "prompt": (
+            "Treat the topic as high biological or chemical risk. Provide a "
+            "strong warning, avoid actionable synthesis, culturing, optimization, "
+            "dosing, scale-up, release, evasion, or harm-enabling instructions, "
+            "and redirect to safety, ethics, compliance, and high-level risk "
+            "analysis."
+        ),
+    },
+    5: {
+        "label": "highest bio/chemical risk",
+        "warning": (
+            "Highest warning. Do not lower safeguards; keep content "
+            "non-operational and compliance-focused."
+        ),
+        "prompt": (
+            "Treat the topic as highest biological or chemical risk. Give a "
+            "prominent warning. Do not lower safeguards or provide hazardous "
+            "operational steps. Keep the response non-operational, "
+            "compliance-focused, and oriented around risk assessment, oversight, "
+            "safer substitutes, incident prevention, and legitimate review "
+            "channels."
+        ),
+    },
+}
+RESEARCH_TRANSPARENCY_REQUIREMENTS = (
+    "Scientific transparency requirements for research, hypothesis, and writer "
+    "modes:\n"
+    "- Expose uncertainty explicitly by labeling confidence, missing information, "
+    "assumptions, and unknowns.\n"
+    "- Present plausible alternatives, counterarguments, and concise debate "
+    "between competing interpretations when useful.\n"
+    "- State provenance for evidence, data, assumptions, retrieved sources, "
+    "generated code, synthetic data, and model-produced content.\n"
+    "- Distinguish direct evidence, inference, speculation, and planned "
+    "validation.\n"
+    "- Identify what observations, sources, or tests would resolve the debate.\n"
+    "- Do not reveal private chain-of-thought; provide concise public reasoning "
+    "and audit notes only."
+)
+HYPOTHESIS_EVIDENCE_AUDIT_REQUIREMENTS = (
+    "Hypothesis-mode evidence requirements:\n"
+    "- Include claim-level evidence audits for selected hypotheses: claim, "
+    "evidence/provenance, support strength, uncertainty, and needed validation.\n"
+    "- Include novelty checks against prior literature when sources are "
+    "available; if search is unavailable, label novelty as unverified.\n"
+    "- Include prospective tests for selected hypotheses, with falsifying "
+    "observations, measurements, controls, and next evidence to collect."
+)
 CLI_SUGGEST_INSTRUCTIONS = (
     "You help users turn a rough research idea into one complete, copy-ready prompt "
     "for a research agent. Treat the user's partial input as a topic seed, not as "
@@ -196,7 +290,7 @@ def _frame_text(text: str = "") -> str:
 
 def _print_einsteinlabs_header(subtitle: str = "") -> None:
     print(_style_cli(_frame_line("="), ANSI_CYAN, ANSI_BOLD))
-    print(_style_cli(_frame_text(" Einstein Research Console"), ANSI_CYAN, ANSI_BOLD))
+    print(_style_cli(_frame_text(f" Einstein Research Console v{APP_VERSION}"), ANSI_CYAN, ANSI_BOLD))
     if subtitle:
         print(_style_cli(_frame_text(f" {subtitle}"), ANSI_CYAN))
     print(_style_cli(_frame_line("="), ANSI_CYAN, ANSI_BOLD))
@@ -204,9 +298,22 @@ def _print_einsteinlabs_header(subtitle: str = "") -> None:
     print(_style_cli(_frame_line("-"), ANSI_BLUE))
 
 
-def _print_startup_menu(model: str) -> None:
+def _print_startup_menu(
+    model: str,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
+) -> None:
     _print_einsteinlabs_header("AI Research + Lab Workflows")
     print(_style_cli(_frame_text(f" Active model: {model}"), ANSI_GREEN))
+    print(
+        _style_cli(
+            _frame_text(
+                " Safety level: "
+                f"{_normalize_bio_chem_safety_level(safety_level)} "
+                f"({_bio_chem_safety_profile(safety_level)['label']})"
+            ),
+            ANSI_GREEN,
+        )
+    )
     print(_style_cli(_frame_text(""), ANSI_BLUE))
     print(_style_cli(_frame_text(" [1] Core Research Pipeline"), ANSI_BLUE, ANSI_BOLD))
     print(_style_cli(_frame_text(" [2] Lab Research (Perplexity Search)"), ANSI_BLUE, ANSI_BOLD))
@@ -1752,6 +1859,58 @@ def _recommended_models_text() -> str:
     return ", ".join(RECOMMENDED_MODELS)
 
 
+def _normalize_bio_chem_safety_level(level: object) -> int:
+    try:
+        parsed = int(str(level).strip())
+    except (TypeError, ValueError):
+        return DEFAULT_BIO_CHEM_SAFETY_LEVEL
+    if parsed < 1 or parsed > 5:
+        return DEFAULT_BIO_CHEM_SAFETY_LEVEL
+    return parsed
+
+
+def _bio_chem_safety_profile(level: object) -> dict[str, str]:
+    normalized = _normalize_bio_chem_safety_level(level)
+    return BIO_CHEM_SAFETY_LEVELS[normalized]
+
+
+def _format_bio_chem_safety_profile(level: object) -> str:
+    normalized = _normalize_bio_chem_safety_level(level)
+    profile = _bio_chem_safety_profile(normalized)
+    return (
+        f"Bio/chemical safety level: {normalized} ({profile['label']}).\n"
+        f"Warning: {profile['warning']}\n"
+        "This setting calibrates warning and review posture only. It does not "
+        "bypass scientific, legal, or safety boundaries."
+    )
+
+
+def _compose_research_agent_instructions(
+    instructions: str,
+    safety_level: object,
+    *,
+    include_hypothesis_audit: bool = False,
+) -> str:
+    sections = [
+        str(instructions or "").strip(),
+        RESEARCH_TRANSPARENCY_REQUIREMENTS,
+    ]
+    if include_hypothesis_audit:
+        sections.append(HYPOTHESIS_EVIDENCE_AUDIT_REQUIREMENTS)
+    sections.extend(
+        [
+            _format_bio_chem_safety_profile(safety_level),
+            _bio_chem_safety_profile(safety_level)["prompt"],
+            (
+                "Never reduce safeguards for hazardous biological or chemical "
+                "content. Prefer safe, high-level, non-operational risk analysis "
+                "when details could enable harm."
+            ),
+        ]
+    )
+    return "\n\n".join(section for section in sections if section)
+
+
 def _coerce_int(value: object, default: int = 0) -> int:
     try:
         return int(value)  # type: ignore[arg-type]
@@ -1859,9 +2018,18 @@ def _format_rate(value: object) -> str:
     return f"${float(value):g}"
 
 
-def _build_session_summary(model_name: str, usage: Usage) -> dict[str, object]:
+def _build_session_summary(
+    model_name: str,
+    usage: Usage,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
+) -> dict[str, object]:
+    normalized_safety_level = _normalize_bio_chem_safety_level(safety_level)
+    safety_profile = _bio_chem_safety_profile(normalized_safety_level)
     return {
         "model": _normalize_model_name(model_name),
+        "safety_level": normalized_safety_level,
+        "safety_profile": safety_profile["label"],
+        "safety_warning": safety_profile["warning"],
         "usage": serialize_usage(usage),
         "tokens": _usage_token_totals(usage),
         "pricing": _estimate_usage_cost_usd(model_name, usage),
@@ -1880,6 +2048,12 @@ def _format_session_summary(summary: dict[str, object]) -> str:
         "# Session Summary",
         "",
         f"Model: {summary.get('model', 'n/a')}",
+        (
+            "Bio/chemical safety level: "
+            f"{summary.get('safety_level', 'n/a')} - "
+            f"{summary.get('safety_profile', 'n/a')}"
+        ),
+        f"Safety warning: {summary.get('safety_warning', 'n/a')}",
         "",
         "## Token Usage",
         f"- Requests: {_coerce_int(tokens.get('requests'), 0):,}",
@@ -1931,14 +2105,21 @@ def _format_session_summary(summary: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _build_pipeline_agents(model_name: str) -> dict[str, Agent]:
+def _build_pipeline_agents(
+    model_name: str,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
+) -> dict[str, Agent]:
     selected_model = _normalize_model_name(model_name)
+    normalized_safety_level = _normalize_bio_chem_safety_level(safety_level)
     medium_reasoning = ModelSettings(reasoning=Reasoning(effort="medium"))
     high_reasoning = ModelSettings(reasoning=Reasoning(effort="high"))
     return {
         "search_planner": Agent(
             name="PlannerAgent",
-            instructions=SEARCH_PLAN_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                SEARCH_PLAN_PROMPT,
+                normalized_safety_level,
+            ),
             model=selected_model,
             model_settings=medium_reasoning,
             output_type=WebSearchPlan,
@@ -1946,35 +2127,51 @@ def _build_pipeline_agents(model_name: str) -> dict[str, Agent]:
         "search": Agent(
             name="SearchAgent",
             model=selected_model,
-            instructions=INSTRUCTIONS,
+            instructions=_compose_research_agent_instructions(
+                INSTRUCTIONS,
+                normalized_safety_level,
+            ),
             tools=[WebSearchTool()],
             output_type=SearchSummary,
         ),
         "plan": Agent(
             name="PlanAgentInteractive",
             model=selected_model,
-            instructions=PLAN_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                PLAN_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=medium_reasoning,
             tools=[WebSearchTool()],
         ),
         "hypothesis": Agent(
             name="HypothesisAgent",
             model=selected_model,
-            instructions=HYPOTHESIS_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                HYPOTHESIS_PROMPT,
+                normalized_safety_level,
+                include_hypothesis_audit=True,
+            ),
             model_settings=high_reasoning,
             tools=[WebSearchTool()],
         ),
         "experiment": Agent(
             name="ExperimentAgent",
             model=selected_model,
-            instructions=EXPERIMENT_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                EXPERIMENT_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=high_reasoning,
             tools=[WebSearchTool()],
         ),
         "experiment_runner": Agent(
             name="ExperimentRunnerAgent",
             model=selected_model,
-            instructions=EXPERIMENT_RUN_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                EXPERIMENT_RUN_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=medium_reasoning,
             tools=[
                 CodeInterpreterTool(
@@ -1988,42 +2185,63 @@ def _build_pipeline_agents(model_name: str) -> dict[str, Agent]:
         "data_analysis": Agent(
             name="DataAnalysisAgent",
             model=selected_model,
-            instructions=DATA_ANALYSIS_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                DATA_ANALYSIS_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=medium_reasoning,
             tools=[WebSearchTool()],
         ),
         "conclusion": Agent(
             name="ConclusionAgent",
             model=selected_model,
-            instructions=CONCLUSION_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                CONCLUSION_PROMPT,
+                normalized_safety_level,
+            ),
             tools=[WebSearchTool()],
         ),
         "latex": Agent(
             name="LatexWriterAgent",
             model=selected_model,
-            instructions=LATEX_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                LATEX_PROMPT,
+                normalized_safety_level,
+            ),
         ),
         "technical_review": Agent(
             name="TechnicalReviewAgent",
             model=selected_model,
-            instructions=TECHNICAL_REVIEW_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                TECHNICAL_REVIEW_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=high_reasoning,
         ),
         "final_latex": Agent(
             name="FinalLatexWriterAgent",
             model=selected_model,
-            instructions=FINAL_LATEX_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                FINAL_LATEX_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=high_reasoning,
         ),
         "latex_fix": Agent(
             name="LatexFixAgent",
             model=selected_model,
-            instructions=LATEX_FIX_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                LATEX_FIX_PROMPT,
+                normalized_safety_level,
+            ),
         ),
         "step_follow_up": Agent(
             name="StepFollowUpAgent",
             model=selected_model,
-            instructions=STEP_FOLLOW_UP_PROMPT,
+            instructions=_compose_research_agent_instructions(
+                STEP_FOLLOW_UP_PROMPT,
+                normalized_safety_level,
+            ),
             model_settings=medium_reasoning,
         ),
     }
@@ -2969,9 +3187,12 @@ def run_pipeline(
     model: str = DEFAULT_MODEL,
     generate_pdf: bool = True,
     print_steps: bool = True,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
 ) -> dict[str, object] | None:
     selected_model = _normalize_model_name(model)
-    agents = _build_pipeline_agents(selected_model)
+    selected_safety_level = _normalize_bio_chem_safety_level(safety_level)
+    safety_profile = _bio_chem_safety_profile(selected_safety_level)
+    agents = _build_pipeline_agents(selected_model, selected_safety_level)
     data_text, data_note = _read_data_input(data_input)
 
     run_id = gen_trace_id()
@@ -3451,7 +3672,11 @@ def run_pipeline(
                 else:
                     print(f">> PDF conversion skipped for {tex_path}: {message}")
 
-        session_summary = _build_session_summary(selected_model, usage_totals)
+        session_summary = _build_session_summary(
+            selected_model,
+            usage_totals,
+            selected_safety_level,
+        )
         session_summary_text = _format_session_summary(session_summary)
         _show_step("Session Summary", session_summary_text)
         if output_dir:
@@ -3467,6 +3692,9 @@ def run_pipeline(
     result_payload = {
         "run_id": run_id,
         "model": selected_model,
+        "safety_level": selected_safety_level,
+        "safety_profile": safety_profile["label"],
+        "safety_warning": safety_profile["warning"],
         "output_dir": output_dir or None,
         "auto_tex_path": auto_tex_path or None,
         "literature_view": literature_view,
@@ -3601,21 +3829,78 @@ def run_web_chat_server(
     port: int = 8000,
     index_file: str = "index.html",
     model: str = DEFAULT_MODEL,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
 ) -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     selected_model = _normalize_model_name(model)
+    selected_safety_level = _normalize_bio_chem_safety_level(safety_level)
     index_path = _resolve_index_path(index_file)
 
     class ChatHandler(BaseHTTPRequestHandler):
         server_version = "VibeResearchHTTP/1.0"
+        MAX_REQUEST_BYTES = 10 * 1024 * 1024
+
+        def _allowed_host_values(self) -> set[str]:
+            bound_host, bound_port = self.server.server_address[:2]
+            port = str(bound_port)
+            values = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+            if bound_host and bound_host not in {"0.0.0.0", "::", "127.0.0.1", "localhost", "::1"}:
+                values.add(f"{bound_host}:{port}")
+            return {v.lower() for v in values}
+
+        def _is_same_origin(self, origin: str) -> bool:
+            if not origin:
+                return False
+            origin_lc = origin.strip().lower()
+            for prefix in ("http://", "https://"):
+                for host in self._allowed_host_values():
+                    if origin_lc == f"{prefix}{host}":
+                        return True
+            return False
+
+        def _check_host(self) -> bool:
+            host_header = (self.headers.get("Host") or "").strip().lower()
+            if host_header in self._allowed_host_values():
+                return True
+            self._send_json(400, {"ok": False, "error": "Invalid Host header."})
+            return False
+
+        def _check_state_change_origin(self) -> bool:
+            origin = (self.headers.get("Origin") or "").strip()
+            if origin:
+                if self._is_same_origin(origin):
+                    return True
+                self._send_json(403, {"ok": False, "error": "Cross-origin request blocked."})
+                return False
+            referer = (self.headers.get("Referer") or "").strip().lower()
+            if referer:
+                for prefix in ("http://", "https://"):
+                    for host in self._allowed_host_values():
+                        base = f"{prefix}{host}"
+                        if (
+                            referer == base
+                            or referer.startswith(base + "/")
+                            or referer.startswith(base + "?")
+                        ):
+                            return True
+                self._send_json(403, {"ok": False, "error": "Cross-origin request blocked."})
+                return False
+            # No Origin and no Referer: not a browser cross-origin request.
+            return True
+
+        def _apply_cors_headers(self) -> None:
+            origin = (self.headers.get("Origin") or "").strip()
+            if origin and self._is_same_origin(origin):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
         def _send_json(self, status_code: int, payload: dict[str, object]) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(status_code)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self._apply_cors_headers()
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
@@ -3629,9 +3914,7 @@ def run_web_chat_server(
             content_type: str,
         ) -> None:
             self.send_response(status_code)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self._apply_cors_headers()
             self.send_header("Content-Type", content_type)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(content)))
@@ -3639,15 +3922,17 @@ def run_web_chat_server(
             self.wfile.write(content)
 
         def do_OPTIONS(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler signature)
+            if not self._check_host():
+                return
             self.send_response(204)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self._apply_cors_headers()
             self.send_header("Allow", "GET, POST, OPTIONS")
             self.send_header("Content-Length", "0")
             self.end_headers()
 
         def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler signature)
+            if not self._check_host():
+                return
             path = (self.path or "").split("?", 1)[0]
             if path in {"", "/", "/index.html"}:
                 try:
@@ -3670,6 +3955,10 @@ def run_web_chat_server(
                         "ok": True,
                         "status": "ready",
                         "model": selected_model,
+                        "safety_level": selected_safety_level,
+                        "safety_profile": _bio_chem_safety_profile(
+                            selected_safety_level
+                        )["label"],
                         "sqlalchemy_session_enabled": _env_flag(
                             "VIBE_USE_SQLALCHEMY_SESSION",
                             True,
@@ -3681,6 +3970,10 @@ def run_web_chat_server(
             self._send_json(404, {"ok": False, "error": "Not found."})
 
         def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler signature)
+            if not self._check_host():
+                return
+            if not self._check_state_change_origin():
+                return
             path = (self.path or "").split("?", 1)[0]
             if path not in {"/api/chat", "/api/pipeline", "/api/suggest"}:
                 self._send_json(404, {"ok": False, "error": "Not found."})
@@ -3698,6 +3991,10 @@ def run_web_chat_server(
 
             if content_length <= 0:
                 self._send_json(400, {"ok": False, "error": "Request body is required."})
+                return
+
+            if content_length > self.MAX_REQUEST_BYTES:
+                self._send_json(413, {"ok": False, "error": "Request body too large."})
                 return
 
             try:
@@ -3819,6 +4116,12 @@ def run_web_chat_server(
             data_input = str(payload.get("data", "")).strip()
             requested_save_dir = str(payload.get("save_dir", "")).strip()
             generate_pdf = _coerce_bool(payload.get("generate_pdf"), False)
+            request_safety_level = _normalize_bio_chem_safety_level(
+                payload.get(
+                    "safety_level",
+                    payload.get("safetyLevel", selected_safety_level),
+                )
+            )
 
             try:
                 result = run_pipeline(
@@ -3829,6 +4132,7 @@ def run_web_chat_server(
                     model=turn_model,
                     generate_pdf=generate_pdf,
                     print_steps=False,
+                    safety_level=request_safety_level,
                 )
             except ValueError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
@@ -3865,6 +4169,7 @@ def run_web_chat_server(
                     "ok": True,
                     "result": result,
                     "model": turn_model,
+                    "safety_level": request_safety_level,
                 },
             )
 
@@ -3888,6 +4193,11 @@ def run_web_chat_server(
     print(f">> Suggest endpoint:  http://{display_host}:{port}/api/suggest")
     print(f">> Health check:  http://{display_host}:{port}/health")
     print(f">> Default model: {selected_model}")
+    print(
+        ">> Bio/chemical safety level: "
+        f"{selected_safety_level} - "
+        f"{_bio_chem_safety_profile(selected_safety_level)['label']}"
+    )
     print(">> Press Ctrl+C to stop.")
 
     try:
@@ -3902,8 +4212,10 @@ def run_interactive_research(
     save_dir: str | None = None,
     model: str = DEFAULT_MODEL,
     generate_pdf: bool = True,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
 ) -> None:
     selected_model = _normalize_model_name(model)
+    selected_safety_level = _normalize_bio_chem_safety_level(safety_level)
     _print_einsteinlabs_header("Core Research Pipeline")
     print(
         _style_cli(
@@ -3933,10 +4245,18 @@ def run_interactive_research(
     print(_style_cli(f"Default model: {DEFAULT_MODEL}", ANSI_YELLOW))
     print(_style_cli(f"Current model: {selected_model}", ANSI_YELLOW))
     print(_style_cli(f"All agents model: {selected_model}", ANSI_YELLOW))
+    print(
+        _style_cli(
+            "Bio/chemical safety level: "
+            f"{selected_safety_level} - "
+            f"{_bio_chem_safety_profile(selected_safety_level)['label']}",
+            ANSI_YELLOW,
+        )
+    )
 
     question = ""
     while not question:
-        entry = _cli_input("Research question (or /model, /suggest, /quit):")
+        entry = _cli_input("Research question (or /model, /safety, /suggest, /quit):")
         if not entry:
             print(">> Please enter a question or command.")
             continue
@@ -3958,6 +4278,14 @@ def run_interactive_research(
             print(f">> Model set to: {selected_model}")
             print(f">> Recommended: {_recommended_models_text()}")
             continue
+        if lowered == "/safety":
+            print(f">> {_format_bio_chem_safety_profile(selected_safety_level)}")
+            continue
+        if lowered.startswith("/safety "):
+            requested = entry.split(" ", 1)[1]
+            selected_safety_level = _normalize_bio_chem_safety_level(requested)
+            print(f">> {_format_bio_chem_safety_profile(selected_safety_level)}")
+            continue
         if lowered == "/suggest":
             print(">> Usage: /suggest <partial>")
             continue
@@ -3977,7 +4305,7 @@ def run_interactive_research(
                 print(">> (no suggestion)")
             continue
         if lowered.startswith("/"):
-            print(">> Unknown command. Supported: /model, /suggest, /quit.")
+            print(">> Unknown command. Supported: /model, /safety, /suggest, /quit.")
             continue
 
         question = entry
@@ -3994,6 +4322,7 @@ def run_interactive_research(
         pause=True,
         model=selected_model,
         generate_pdf=generate_pdf,
+        safety_level=selected_safety_level,
     )
 
 
@@ -4017,12 +4346,14 @@ def run_startup_menu(
     save_dir: str | None = None,
     model: str = DEFAULT_MODEL,
     generate_pdf: bool = True,
+    safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
 ) -> None:
     selected_model = _normalize_model_name(model)
+    selected_safety_level = _normalize_bio_chem_safety_level(safety_level)
 
     while True:
-        _print_startup_menu(selected_model)
-        raw_choice = _cli_input("Choose an option [0-3] (or /model <name>):").strip()
+        _print_startup_menu(selected_model, selected_safety_level)
+        raw_choice = _cli_input("Choose an option [0-3] (or /model, /safety):").strip()
         choice = raw_choice.lower()
 
         if not choice:
@@ -4038,6 +4369,7 @@ def run_startup_menu(
                 save_dir=save_dir,
                 model=selected_model,
                 generate_pdf=generate_pdf,
+                safety_level=selected_safety_level,
             )
             continue
         if choice == "2":
@@ -4066,6 +4398,7 @@ def run_startup_menu(
                 port=port,
                 index_file=index_file,
                 model=selected_model,
+                safety_level=selected_safety_level,
             )
             continue
         if choice == "/model":
@@ -4077,8 +4410,26 @@ def run_startup_menu(
             selected_model = _normalize_model_name(requested)
             print(_style_cli(f">> Model set to: {selected_model}", ANSI_YELLOW))
             continue
+        if choice == "/safety":
+            print(
+                _style_cli(
+                    f">> {_format_bio_chem_safety_profile(selected_safety_level)}",
+                    ANSI_YELLOW,
+                )
+            )
+            continue
+        if choice.startswith("/safety "):
+            requested = raw_choice.split(" ", 1)[1]
+            selected_safety_level = _normalize_bio_chem_safety_level(requested)
+            print(
+                _style_cli(
+                    f">> {_format_bio_chem_safety_profile(selected_safety_level)}",
+                    ANSI_YELLOW,
+                )
+            )
+            continue
 
-        print(_style_cli(">> Invalid option. Choose 0-3 or use /model.", ANSI_RED, ANSI_BOLD))
+        print(_style_cli(">> Invalid option. Choose 0-3 or use /model or /safety.", ANSI_RED, ANSI_BOLD))
 
 
 def _parse_args() -> argparse.Namespace:
@@ -4103,6 +4454,16 @@ def _parse_args() -> argparse.Namespace:
         "--no-pdf",
         action="store_true",
         help="Skip LaTeX to academic paper PDF conversion.",
+    )
+    parser.add_argument(
+        "--safety-level",
+        default=DEFAULT_BIO_CHEM_SAFETY_LEVEL,
+        type=int,
+        help=(
+            "Bio/chemical risk warning level from 1 to 5. "
+            "Level 1 is lowest risk; level 5 is highest risk and does not "
+            "lower safeguards."
+        ),
     )
 
     subparsers = parser.add_subparsers(dest="mode")
@@ -4185,6 +4546,7 @@ if __name__ == "__main__":
     args = _parse_args()
     model_name = _normalize_model_name(args.model)
     generate_pdf = not args.no_pdf
+    safety_level = _normalize_bio_chem_safety_level(args.safety_level)
 
     if args.mode == "auto":
         data_input = args.data_file or args.data
@@ -4195,6 +4557,7 @@ if __name__ == "__main__":
             pause=args.pause,
             model=model_name,
             generate_pdf=generate_pdf,
+            safety_level=safety_level,
         )
     elif args.mode == "latex2pdf":
         pdf_ok, tex_path, pdf_path, message = _convert_tex_file_to_academic_pdf(
@@ -4214,12 +4577,14 @@ if __name__ == "__main__":
             port=args.port,
             index_file=args.index,
             model=model_name,
+            safety_level=safety_level,
         )
     elif args.mode == "interactive":
         run_interactive_research(
             save_dir=args.save or None,
             model=model_name,
             generate_pdf=generate_pdf,
+            safety_level=safety_level,
         )
     elif args.mode == "lab":
         run_lab_research()
@@ -4229,4 +4594,5 @@ if __name__ == "__main__":
             save_dir=args.save or None,
             model=model_name,
             generate_pdf=generate_pdf,
+            safety_level=safety_level,
         )
