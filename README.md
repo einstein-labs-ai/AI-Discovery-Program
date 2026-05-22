@@ -848,6 +848,10 @@ For stronger research results:
 
 ---
 
+## Safety
+Now we added safety level: 
+/safety [1-5]` shows or changes the bio/chemical risk warning level.
+
 ## 23. Discussion
 
 `EinsteinResearch.py` is designed as a full AI-assisted research workflow rather than a simple chatbot. Its main value is that it connects the major stages of scientific work into a repeatable process: planning, literature review, hypothesis generation, experiment design, data analysis, conclusion writing, and report generation.
