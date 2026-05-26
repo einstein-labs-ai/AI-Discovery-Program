@@ -870,3 +870,6 @@ For questions, demos, or collaboration opportunities, contact Einsteinian Labs.
 
 ## 25. Note
 This respository is for YC batch 2026 demo. Please do not clone without consent
+
+## 26. Links
+For fully automated science coding agent, please use (Autocodex-sci)[https://github.com/einstein-labs-ai/autocodex-sci]
