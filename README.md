@@ -873,3 +873,6 @@ This respository is for YC batch 2026 demo. Please do not clone without consent
 
 ## 26. Links
 For fully automated science coding agent, please use [Autocodex-sci](https://github.com/einstein-labs-ai/autocodex-sci)
+
+### 27. Version
+current version: 0.9
