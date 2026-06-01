@@ -8,7 +8,7 @@ const readline = require("node:readline/promises");
 const { stdin: input, stdout: output } = require("node:process");
 
 const APP_NAME = "AI Discovery CLI";
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.1.1";
 const DEFAULT_MODEL = "gpt-5.5";
 const DEFAULT_OUTPUT_DIR = "ai_discovery_runs";
 const DEFAULT_TIMEOUT_MS = 120000;
