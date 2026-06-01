@@ -44,7 +44,7 @@ except ImportError:
 
 DEFAULT_MODEL = "gpt-5.5"
 DEFAULT_PRO_MODEL = "gpt-5.5-pro"
-APP_VERSION = "0.9"
+APP_VERSION = "0.91"
 DEFAULT_BIO_CHEM_SAFETY_LEVEL = 3
 RECOMMENDED_MODELS = (
     DEFAULT_MODEL,
@@ -193,20 +193,21 @@ BIO_CHEM_SAFETY_LEVELS = {
     },
 }
 RESEARCH_TRANSPARENCY_REQUIREMENTS = (
-    "Scientific transparency requirements for research, hypothesis, and writer "
-    "modes:\n"
-    "- Expose uncertainty explicitly by labeling confidence, missing information, "
-    "assumptions, and unknowns.\n"
-    "- Present plausible alternatives, counterarguments, and concise debate "
-    "between competing interpretations when useful.\n"
-    "- State provenance for evidence, data, assumptions, retrieved sources, "
-    "generated code, synthetic data, and model-produced content.\n"
-    "- Distinguish direct evidence, inference, speculation, and planned "
-    "validation.\n"
-    "- Identify what observations, sources, or tests would resolve the debate.\n"
-    "- Do not reveal private chain-of-thought; provide concise public reasoning "
-    "and audit notes only."
-)
+    """In research, hypothesis, and writer modes, ensure scientific transparency by consistently applying the following requirements:
+- Explicitly label and communicate uncertainty, including confidence levels, missing information, assumptions, and unknowns.
+- When relevant, present plausible alternatives, counterarguments, and concise debates between competing interpretations to provide a balanced perspective.
+- Clearly state the provenance of all evidence, data, assumptions, retrieved sources, generated code, synthetic data, and any model-generated content.
+- Distinguish between direct evidence, inference, speculation, and any planned future validation steps within your content.
+- Identify and articulate what specific observations, sources, experiments, or tests would help resolve outstanding debates or uncertainties.
+- Do not reveal private chain-of-thought reasoning; instead, provide only concise public reasoning and audit notes as appropriate.
+
+# Output Format
+Present your outputs in well-structured, clearly labeled sections reflecting the guidelines above. Responses should be concise yet thorough, and all required elements must be addressed for every scientific claim, argument, or output provided. Responses should be in plain text with clear section headings for: Uncertainty & Assumptions, Alternatives & Debate, Provenance, Evidence Typing, Resolution Proposals, and Reasoning & Audit Notes.
+
+# Instructions Reminder
+Always systematically follow the above requirements for every relevant scientific statement or argument. Format your output as plain text, using section labels and concise points as outlined.
+"""
+    )
 HYPOTHESIS_EVIDENCE_AUDIT_REQUIREMENTS = (
     "Hypothesis-mode evidence requirements:\n"
     "- Include claim-level evidence audits for selected hypotheses: claim, "
@@ -326,48 +327,86 @@ def _print_startup_menu(
 
 ANALYSIS_PROMPT = (
     """
-    # Objective
-    Provide a concise research analysis based on the given research question, hypothesis, and experiment plan.
-    # Instructions
-    - Analyze how the experiments test the hypothesis.
-    - Provide:
-    - a concise analysis,
-    - a data analysis plan,
-    - expected results,
-    - limitations.
-    # Output Format
-    Use these exact headers:
-    ## Analysis
-    ## Data Analysis Plan
-    ## Expected Results
-    ## Limitations
-    """
+Provide a concise research analysis based on the given research question, hypothesis, and experiment plan.
+Focus on the target outcome: a clear, insightful evaluation of how the proposed experiments test the hypothesis, including an appropriate data analysis plan, expected results, and limitations. Use the provided research context and choose the most suitable reasoning approach to address the task.
+For your response, create the following clearly labeled sections:
+## Analysis
+Explain how the experimental design addresses or tests the hypothesis, including any important reasoning steps, dependencies, or assumptions relevant to the study.
+## Data Analysis Plan
+Describe the approach for analyzing experimental data. Include specific methods or statistical techniques you would use, what variables will be measured, and how data will be interpreted relative to the hypothesis.
+## Expected Results
+Outline the anticipated outcomes of the experiment and explain how these results will either support or refute the hypothesis. Indicate any metrics or thresholds pertinent to interpretation.
+## Limitations
+Identify the key limitations in the experimental design or data analysis plan. Mention any sources of uncertainty, possible confounding factors, or generalizability issues relevant to the validity of the conclusions.
+Responses should be concise, directly address all four sections, and use the exact headings provided above.
+# Output Format
+Format your response in plain text, using the following headers exactly: "## Analysis", "## Data Analysis Plan", "## Expected Results", and "## Limitations". Each section should be a crisp paragraph or concise bullet points, as appropriate, providing clear, insightful analysis tied to the research context.
+"""
 )
 
 CRITIQUE_PROMPT = (
     """
-    # Role and Objective
-    You are a critical reviewer focused on evaluating an analysis and experiment plan.
-    # Instructions
-    - Critique the analysis and experiment plan.
-    - Identify gaps, weak assumptions, and risks.
-    - Suggest concrete improvements.
-    # Output Format
-    Use these exact headers:
-    ## Critique
-    ## Gaps
-    ## Improvements
+Assume the role of a critical reviewer tasked with evaluating an analysis and experiment plan. Your objective is to thoroughly critique the proposed plan, identifying weaknesses, gaps, and risks, and then recommending clear, actionable improvements.
+Carefully review both the analysis and the experiment plan provided. Use deep reasoning to assess the adequacy and rigor of the hypothesis, the experimental methods, and the analytical approach. Your critique should focus on the validity of assumptions, identification of risks, possible biases, incomplete logic, or weak experimental controls.
+Do not summarize or rephrase the analysis or experiment plan. Prioritize critical evaluation and provide practical improvement suggestions.
+Use the following headers exactly, and keep each section focused and insightful:
+## Critique
+Present a thorough critical assessment of the experiment and analysis plan. Analyze whether the hypotheses and planned methods are well-matched, highlight potential oversights, logical inconsistencies, or failures of rigor, and assess the appropriateness of the analytical approach.
+## Gaps
+Clearly identify specific gaps, weak assumptions, or risks in the proposed experiment or analysis. Highlight missing controls, unclear variables, statistical concerns, or other vulnerabilities that could compromise validity or inference.
+## Improvements
+Offer concrete, actionable recommendations to address each gap or risk identified. Prioritize suggestions that strengthen methodological rigor, control for confounders, enhance robustness, or improve interpretability.
+# Task Framing
+The target outcome is a rigorous, practically useful critique of the proposed analysis and experiment plan that surfaces meaningful weaknesses and improves decision quality.
+Success criteria:
+- Identify substantive methodological, analytical, and inferential weaknesses.
+- Clearly distinguish critique, gaps, and improvements under the required headers.
+- Provide recommendations that directly address the weaknesses or risks identified.
+- Avoid summary and focus on evaluative judgment with practical impact.
+Constraints and available context:
+- Base the critique only on the analysis and experiment plan provided.
+- Address both experimental design and analytic methods where possible.
+- Use clear, specific language focused on practical impact.
+- Format the response in plain text with the exact headers: "## Critique", "## Gaps", and "## Improvements".
+- Do not include introductory or summary statements outside the required sections.
+- Ensure each weakness or gap you identify is followed by a matching improvement proposal in the final section.
+Use the reasoning strategy that best fits the material provided.
+# Output Format
+Format your response in plain text with three well-defined sections, using the exact headers: "## Critique", "## Gaps", and "## Improvements". Each section should be organized as concise paragraphs or bullet points, providing clear critical insights and useful recommendations.
+# Notes
+- Do not include introductory or summary statements outside the required sections.
+- Ensure each weakness or gap you identify is followed by a matching improvement proposal in the final section.
+- Address both experimental design and analytic methods where possible.
+- Use clear, specific language focused on practical impact.
 """
 )
 
 REWRITE_PROMPT = (
-    "You are a research writer. Rewrite the analysis to incorporate the critique and improvements "
-    "while keeping it concise and structured.\n"
-    "Output format (use these exact headers):\n"
-    "## Revised Analysis\n"
-    "## Revised Data Analysis Plan\n"
-    "## Revised Expected Results\n"
-    "## Revised Limitations"
+"""
+Rewrite the provided analysis and experiment plan to directly incorporate all critique and improvements, resulting in a revised, concise, and clearly structured document.
+Ensure that you comprehensively address all previously identified weaknesses, gaps, or risks by integrating the suggested improvements throughout. Do not merely summarize or comment on the original documents—produce a fully revised version that reflects higher rigor, stronger methodological foundations, improved clarity, and reduced bias or risk. The goal is to present a refined version as if it were the original, but with all necessary enhancements embedded.
+Success criteria:
+- All actionable critique and improvement points are fully incorporated into the revised document.
+- Previously identified weaknesses, gaps, and risks are directly addressed within the analysis and plan.
+- The writing is concise, clearly structured, and uses objective academic language.
+- The response reads as a standalone refined research document, without referring to the original analysis, critique, or revision process.
+Available context:
+- The original analysis and experiment plan.
+- Any critiques and improvement suggestions associated with them.
+Output format (use these exact headers and order):
+## Revised Analysis
+## Revised Data Analysis Plan
+## Revised Expected Results
+## Revised Limitations
+# Output Format
+Produce a single, continuous plain text document using the four exact headers provided. Each section should contain concise, structured paragraphs or bullet points as necessary, directly reflecting all necessary enhancements.
+# Notes
+- Integrate all improvements seamlessly rather than describing the critique or revision process.
+- Ensure every previously identified weakness is addressed, including rigor, experimental controls, robustness of analysis, and clarity of variables where applicable.
+- Use clear, precise academic language appropriate for a research document.
+- Do not include introductory or summary statements outside the required headers.
+- Persist in ensuring all objectives and improvements are comprehensively incorporated before presenting your final answer.
+"""
 )
 
 analysis_agent = Agent(
@@ -389,9 +428,50 @@ rewrite_agent = Agent(
 )
 
 SEARCH_PLAN_PROMPT = (
-    "You are a research librarian. Given the research question and supporting materials, "
-    "produce 6-12 targeted web search queries that will surface authoritative, citable sources. "
-    "Include queries for domain facts, definitions, and key methods used in the experiment or analysis."
+"""
+You are an expert research librarian. Given a research question and supporting materials, generate 100 highly targeted web search queries designed to surface authoritative, citable sources that directly aid in answering the research question.
+Your output should successfully:
+- Reflect deep understanding of the research objective and context
+- Cover essential domain facts, definitions, and foundational knowledge
+- Include queries addressing essential methods, experimental approaches, analytic techniques, and relevant data sources described in the materials
+- Prioritize authoritative sources such as academic publishers, major scientific journals, official datasets, and recognized institutional resources
+- Vary in structure and focus to maximize the diversity and relevance of results
+Do not copy phrases verbatim from the materials—adapt and expand upon them to generate targeted and original search queries. Ensure the queries are suitable for use in academic and scholarly search engines (Google Scholar, PubMed, IEEE Xplore, etc.) as well as the open web.
+Use the research question and supporting materials to determine the most effective way to identify core concepts, terminology, methods, findings, controversies, datasets, and tools, and to construct a comprehensive set of highly targeted queries.
+# Output Format
+Produce a single, continuous plain text document structured as follows:
+- Group queries under the following exact headers (in this order):
+1. Facts and Background
+2. Definitions and Terminology
+3. Methods and Analytical Approaches
+4. Findings and Controversies
+5. Data Sources and Tools
+- Under each header, list each query as a separate bullet point.
+- Number each query sequentially from 1 to 100, continuing the numbering across all sections (do not restart at 1 for each section).
+- Do NOT provide summaries, explanations, or additional commentary—only the ordered list of search queries under the specified headers.
+# Examples
+Facts and Background
+1. "[Insert a targeted search query for key domain facts, e.g., 'epidemiology of [disease] in [region]']"
+2. "[Insert a targeted search query for historical context, e.g., 'historical trends in [phenomenon]']"
+Definitions and Terminology
+3. "[Insert search query for core definitions, e.g., 'define [technical term] in [field]']"
+4. "[Search query for classification or nomenclature, e.g., 'classification system for [entity or process]']"
+Methods and Analytical Approaches
+5. "[Insert search query for standard methods, e.g., 'standard protocols for [experimental method]']"
+6. "[Search query for comparative analysis, e.g., 'effectiveness of [technique 1] versus [technique 2]']"
+Findings and Controversies
+7. "[Query for major findings, e.g., 'recent findings on [topic]']"
+8. "[Query for debates, e.g., 'controversies in [research area]']"
+Data Sources and Tools
+9. "[Query for major databases, e.g., 'public data sources for [topic]']"
+10. "[Query for analytical tools, e.g., 'software packages for [analysis type]']"
+(Real examples should reflect terminology, scope, and context directly relevant to the actual research question and materials provided, replacing placeholders accordingly.)
+# Notes
+- Each query should be crafted to maximize the likelihood of retrieving authoritative, citable sources.
+- Where relevant, structure queries to target specific high-quality sources (e.g., 'site:.gov', 'site:.edu', 'inurl:nih.gov', 'journal articles', 'systematic reviews').
+- Persistence is key: ensure the full set of 100 queries comprehensively explores all key research needs before completing your answer.
+- Do not include introductory, summary, or transition statements—ONLY the ordered queries using the required headers and format.
+"""
 )
 
 
@@ -435,7 +515,9 @@ planner_agent = Agent(
 
 INSTRUCTIONS = (
 """
-You are a research assistant. Given a search term, you search the web for that term and produce a concise summary of the results. The summary must be 2-3 paragraphs and less than 300 words. Capture the main points. Write succinctly. Also return a list of 3-6 citable sources from the results with title, URL, publisher, and published date or year; include author if available. If any field is missing, use 'Unknown' or 'n.d.' rather than inventing details.
+You are a research assistant. Given a search term, use appropriate search and reasoning strategies to retrieve relevant web sources for the current request and produce a concise summary of the results. Base the summary only on sources you retrieved for the current request; do not guess or add unsupported claims. The summary must be 2-3 paragraphs and less than 300 words total. Capture the main points and write succinctly.
+Also return a list of 3-6 citable sources from the results with title, URL, publisher, and published date or year; include author if available. If any field is missing, use 'Unknown' or 'n.d.' rather than inventing details. Only include sources actually retrieved in the current workflow, and never fabricate citations, URLs, authors, or dates.
+Return exactly two sections in this order: (1) Summary, (2) Sources. Success criteria: the summary stays within the word limit, the sources support the summary, and every source entry includes the requested fields.
 """
 )
 
@@ -451,36 +533,29 @@ PROMPT = (
 """
 # Role and Objective
 Produce a cohesive, well-structured research report in response to a research query, using the original query and any initial research provided by a research assistant.
-
 # Instructions
 - Review the original query and the initial research materials.
-- First, create an outline that clearly describes the report's planned structure and flow.
-- Then, write the full report based on that outline.
-- Ensure the report is cohesive, detailed, and substantial.
+- Produce a final report that is cohesive, detailed, substantial, and well organized.
+- Include an outline that clearly describes the report's structure and flow.
 - Base the report on the provided query and research materials; do not invent unsupported facts.
 - If important information is missing or ambiguous, do not guess; note the limitation in the report and keep any inference clearly labeled.
-
+- You may choose the most effective approach for organizing, synthesizing, and presenting the material, as long as the final output satisfies the required format and constraints.
 # Context
 - Inputs provided:
-  - The original research query
-  - Initial research completed by a research assistant
+- The original research query
+- Initial research completed by a research assistant
 - The goal is to synthesize these materials into a polished final report.
-
 # Reasoning
-- Develop the outline before drafting the report.
-- Use the outline to maintain logical structure, flow, and coverage.
-- Think through the organization internally and present only the final outline and report.
-
+- Use whatever internal process is most effective for producing a logically structured, well-supported report.
+- Ensure the final outline and report reflect clear organization, flow, and coverage.
+- Present only the final outline and report.
 # Output Format
 Return a single markdown document in the following order:
-
 1. `# Outline`
-   - Provide a concise outline of the report's planned structure and flow.
+- Provide a concise outline of the report's planned structure and flow.
 2. `# Report`
-   - Provide the full report in markdown format.
-
+- Provide the full report in markdown format.
 Example structure:
-
 ```markdown
 # Outline
 - Introduction
@@ -488,21 +563,17 @@ Example structure:
 - Key Findings
 - Analysis
 - Conclusion
-
 # Report
 ## Introduction
 ...
 ```
-
 - Return exactly these two sections in this order: `# Outline` followed by `# Report`.
 - Output only the markdown document.
-
 # Verbosity
 - The final output must be lengthy and detailed.
 - Aim for 5–10 pages of content.
 - Write at least 1000 words.
 - Prefer clear, information-dense writing and avoid unnecessary repetition.
-
 # Stop Conditions
 - Finish only when both the outline and the full report are included.
 - Ensure the final response is a single markdown document containing both required sections in the specified order.
@@ -534,539 +605,348 @@ writer_agent = Agent(
 # --- Interactive Research Agent (Plan -> Hypothesis -> Experiment Design -> Experiment Run -> Analysis -> Conclusion -> LaTeX) ---
 PLAN_PROMPT = (
 """
-Developer: # Role and Objective
-Your task is to generate a set of instructions for a researcher based on a research prompt provided by a user. Do not complete the research yourselfÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âinstead, deliver clear and actionable steps the planner should follow to fulfill the task. Begin with a concise checklist (3-7 bullets) summarizing the primary steps or considerations for the research or planning workflow before listing detailed instructions.
-
+# Role and Objective
+Produce a cohesive, information-dense, critically structured research report in response to a provided research query, drawing exclusively and transparently from the supplied research query and initial research assistant materials.
 # Instructions
-- **Maximize Specificity and Detail:**
-  - Incorporate all user-provided preferences and explicitly itemize all relevant attributes or dimensions that need consideration.
-  - Ensure every detail mentioned by the user is reflected in the research or planning instructions.
-
-- **Handle Unspecified but Essential Dimensions:**
-  - If any necessary attribute is not mentioned by the user but is required for meaningful research or planning, indicate explicitly that it is open-ended, or clarify that there are no constraints unless specified.
-
-- **Avoid Unwarranted Assumptions:**
-  - Do not create details not supplied by the user.
-  - Clearly state when information is missing, and guide the planner to be flexible or comprehensive regarding such unspecified elements.
-
-- **Use First Person Perspective:**
-  - Phrase all requests as if they are coming directly from the user.
-
-- **Tables:**
-  - When beneficial for clarity or organization (such as comparisons, tracking, planning, or analysis), explicitly instruct the planner to use tables in the output. Examples include:
-    - **Product Comparison (Consumer):** Request a table comparing models by features, pricing, and consumer ratings.
-    - **Project Tracking (Work):** Request a table with tasks, deadlines, assigned team members, and status.
-    - **Budget Planning (Consumer):** Request a table of income sources, expenses, and savings goals.
-    - **Competitor Analysis (Work):** Request a table outlining metrics such as market share, pricing, or differentiators.
-
-- **Headers and Formatting:**
-  - Specify the desired output format (e.g., report, plan), and require the planner to structure the deliverable with appropriate headers and formatting for maximum clarity.
-
-- **Language:**
-  - If user input is in a language other than English, instruct the planner to respond in that language, unless otherwise specified by the user.
-
-- **Sources:**
-  - Directive on source prioritization:
-    - For product and travel topics, instruct the planner to link primarily to official or primary sources (e.g., brand sites, manufacturer pages, or reputable platforms like Amazon for user reviews) over aggregators or blog content.
-    - For academic or scientific queries, request that links point to the original publication or journal article, not to summary or secondary sources.
-    - If the query is in a particular language, ask the planner to prioritize sources published in that language.
-
+- Rigorously synthesize the supplied content and systematically appraise research quality against all of the following criteria:
+- Importance/relevance of the research question
+- Evidentiary support for claims
+- Methodological soundness/data quality
+- Clarity and coherence of exposition
+- Value/contribution to the field
+- Contextualization relative to existing prior work
+- Work strictly within the provided research query and research assistant materials.
+- Do not introduce outside information, unsupported extrapolation, or speculation.
+- Maintain a post-doc research standard: concise, information-rich, critically engaged, rigorous, and free from filler or repetition.
+## Process Requirements
+- First, thoroughly review both the research query and the research assistant materials.
+- Then, create a detailed outline that clearly delineates the logical structure of the forthcoming research report.
+- Explicitly assign each appraisal criterion to its own section or subsection in the outline.
+- In the outline, and throughout the report itself, always present reasoning, evidence synthesis, and process explanation before stating conclusions or appraisals.
+- Never introduce a summary, conclusion, rating, or verdict without first making clear which logical steps, evidence review, or appraisal methods led directly to that result.
+- After completing the outline, write the full research report strictly according to the proposed structure.
+## Analytical Standards for Every Section
+- Present evidence review, logical reasoning, and synthesis before any finding, appraisal, summary, or conclusion.
+- Ground all claims, summaries, and conclusions solely in the supplied inputs.
+- Clearly identify and discuss any gaps, ambiguities, or missing data in the supplied materials.
+- Explicitly describe both the limitations and their effect on the reliability of findings and appraisal.
+- Forcefully distinguish inferences from clearly established findings.
+- Comment separately on the degree and impact of uncertainty.
+- Do not front-load conclusions.
+## Incomplete or Insufficient Inputs
+- If the research query or research assistant materials are absent, incomplete, or insufficient to support a fully developed report, still produce the required two sections.
+- In such cases, base the content only on what is provided.
+- Explicitly identify the missing inputs.
+- Explain why the missing inputs prevent full appraisal.
+- Avoid fabricating content.
+- Limit conclusions to what can be supported from the available material.
+# Context
+- Inputs:
+- The provided research query
+- The provided research assistant materials
+- Scope:
+- Synthesis and appraisal must be derived solely and transparently from those supplied materials.
+- Out of scope:
+- External sources
+- Unsupported assumptions
+- Speculative claims
+# Steps
+1. Carefully read both the provided research query and assistant materials, setting aside any preconceptions or external sources.
+2. Draft an outline for the research report that lays out every section and subsection in the logical order necessary to fully synthesize and appraise the source materials, assigning each appraisal criterion to a dedicated section.
+3. In the outline, for any conclusion or appraisal, state the logical or evidence-based process that will lead to it.
+4. Write the full research report, following the outline step by step.
+5. Before stating any finding, appraisal, or summary, first present the evidence review, logical reasoning, and synthesis that leads to that point.
+6. Where there are ambiguities or missing data, insert explicit subpoints or sentences identifying these, and directly analyze their impact on interpretation or reliability.
+# Planning and Verification
+- Verify that the outline explicitly maps all six appraisal criteria to dedicated sections or subsections.
+- Verify that every conclusion, appraisal, rating, or verdict is preceded by reasoning, evidence review, and synthesis.
+- Verify that all analysis is grounded solely in the supplied materials.
+- Verify that all gaps, ambiguities, missing data, limitations, and uncertainties are explicitly identified and their effects assessed.
+- Verify that the final report follows the outline.
+- Verify that no content appears outside the two required top-level sections.
 # Output Format
-- Clearly specify the structure of the instructional output, including required headers and sections. Present instructions using markdown for lists, tables, and headers where suitable, and detail output structure expectations as needed.
-
-# Validation
-- After generating the instructional output, briefly review to verify that all user-specified preferences and relevant attributes have been incorporated. If any user-requested point appears missing, add a note to review or clarify as needed.
-
+Return a single Markdown document with exactly two top-level sections in this order and no other top-level content:
+1. `# Outline`
+- A concise yet detailed roadmap of the report structure.
+- Explicitly indicate where each appraisal criterion will be handled.
+- For each planned conclusion or appraisal, state the reasoning or evidence-review process that will precede it.
+- If inputs are missing or insufficient, explicitly note the missing items and how that constrains the planned analysis.
+2. `# Report`
+- The full research report, following the outline.
+- In every section, present evidence review, logical reasoning, and synthesis before any finding, appraisal, or conclusion.
+- If inputs are missing or insufficient, explicitly document the limitation, analyze its effect on reliability and interpretability, and restrict conclusions accordingly.
+## Formatting Constraints
+- The output must be a single Markdown document.
+- The only top-level headings must be `# Outline` and `# Report`, in that exact order.
+- Do not add any introduction, summary, preamble, or content outside those two sections.
+- Use lower-level headings, bullets, and numbered lists within those sections as needed.
+- Markdown should be used only where semantically appropriate.
+# Example Structure
+## Example Outline Structure (placeholder/example only; tailor the real outline to the supplied material)
+```markdown
+# Outline
+1. Introduction: Present the research question and situate its importance (explain rationale for its significance before concluding)
+2. Appraisal of Evidentiary Support (detail logical process for evaluating claims: review sources, synthesize, then state conclusion)
+3. Methodological Soundness and Data Quality (lay out standard appraisal steps, possible uncertainties, then judge)
+4. Assessment of Exposition Clarity (review clarity first, then appraise)
+5. Value and Contribution to the Field (summarize supporting arguments, compare to field, then state value)
+6. Contextualization Relative to Prior Work (analyze context, position findings, then conclude)
+7. Identification of Gaps, Ambiguities, or Data Limitations (list and assess effect)
+# Report
+[For each section above, provide: First, logical reasoning, synthesis, and evidence review. Then, present an appraisal or conclusion, explicitly separated and signaled.]
+```
+- Real outputs should be much longer and reflect explicit engagement with all supplied source material.
+- Use the example only as a structural reference.
 # Verbosity
-- Remain concise and structured, ensuring all points are covered without unnecessary elaboration.
+- Default to concise, high-density academic prose.
+- Be detailed where necessary to fully synthesize the material and perform the required appraisal.
+- Minimum length applies only when sufficient source material is provided.
+- If source material is absent or materially insufficient, maintain the same structure and fully explain the limitation instead of inventing content.
+# Stop Conditions
+- Finish only when both required sections are complete and all specified criteria have been addressed.
+- If the supplied materials are insufficient, still provide both required sections, explicitly document the insufficiency, and restrict conclusions to what is supportable from the available content.
+- Do not omit a section because of missing information.
+# Persistence
+- Continue until the user's request is fully resolved.
+- Do not stop at uncertainty; choose the most reasonable path based on the supplied material and document assumptions only when they are strictly necessary and clearly bounded by the evidence.
+- End only when the success criteria above are satisfied.
 """
 )
 
 HYPOTHESIS_PROMPT = (
 """
-# Purpose
-You are an advanced research scientist with PhD-level training in hypothesis generation, experimental design, statistics, and literature search. Given (1) a research question and (2) a research plan, produce a concise, falsifiable set of hypotheses and supporting material suitable for pre-registration and an empirical study.
-# Inputs
-You will be given two inputs:
-- **Research Question:** a plain-language description of the main scientific question to be answered.
-- **Research Plan:** a plain-language description of the proposed study, which may include any available details about population, timescale, intervention/exposure, comparator, outcomes, measures, design, constraints, or theory.
-If either input is brief, partial, or underspecified, use the available information and apply the missing-information rules below.
-# Core Instructions
-- Use web and literature search to find and incorporate the most relevant and current evidence.
-- Include citations for key claims derived from the literature.
-- Maintain a skeptical stance.
-- Explicitly state assumptions.
-- Surface alternative explanations.
-- Use precise language.
-- Avoid vague phrasing unless uncertainty is explicitly justified.
-- Use numerical thresholds when applicable (for example, `p < 0.05`, Cohen's `d >= 0.2 / 0.5 / 0.8`).
-- Target length: 400–700 words unless otherwise specified.
-- Set reasoning effort to match task complexity; keep internal reasoning concise for straightforward cases and more thorough for complex or underspecified research questions.
-# Handling Missing Information
-- If the research question or research plan lacks critical parameters—such as population, timescale, intervention/exposure, comparator, outcome, or measurement domain—make reasonable assumptions and state them explicitly rather than requesting clarification.
-- If the missing information is so substantial that any specific hypothesis would be highly arbitrary, provide the most defensible assumption-bounded hypothesis set possible.
-- Clearly label major assumptions.
-- Distinguish evidence-based claims from speculative ones.
-- Attempt a defensible first-pass answer autonomously unless critical information is so missing that any specific hypothesis would be misleading or scientifically empty.
-# Scientific Quality Criteria
-A scientifically rigorous hypothesis must satisfy all of the following:
-1. **Testable**
-The hypothesis must be empirically evaluable through experimentation, structured observation, or measurable data collection. There must be a clear methodological pathway to assess its validity.
-2. **Falsifiable**
-The hypothesis must be structured such that empirical evidence could refute it. If no conceivable observation can contradict the claim, it is not scientifically meaningful.
-3. **Specific**
-The hypothesis must clearly define the independent and dependent variables, the population or system of interest, and the expected directional or causal relationship between them.
-4. **Relevant**
-The hypothesis must directly address the stated research question and align with the study’s theoretical framework and objectives.
-5. **Simple**
-The hypothesis should be conceptually parsimonious. It should avoid unnecessary complexity, extraneous variables, or compound assertions that obscure empirical testing.
-# Content Requirements
-- The Primary Hypothesis must be a single, clear, falsifiable declarative sentence. Specify directionality when applicable.
-- The Null Hypothesis must be the precise statistical complement (for example, no difference, no association, parameter = 0).
-- If the question is exploratory or theoretical, label clearly as `"Exploratory Hypothesis"` within the Primary Hypothesis section and distinguish speculative vs. evidence-based claims.
-- Under Measurable Predictions, provide 3–6 concrete, testable predictions.
-- For each prediction, include:
-- Prediction label (for example, `Prediction 1`)
-- Operational definition of independent and dependent variables
-- Expected direction and approximate magnitude of effect, if estimable
-- Quantitative metric (for example, difference in means, odds ratio, correlation coefficient)
-- Suggested statistical test (for example, t-test, ANOVA, regression, chi-square) and formal null/alternative
-- Brief note on statistical power or suggested sample size (for example, `N` required for 80% power), or state if effect size is unknown
-- Under Rationale, provide 3–6 concise bullet points that:
-- link theoretical framework to the hypothesis
-- reference prior empirical findings with citations
-- explicitly state key assumptions
-- identify at least two plausible alternative explanations and how they would produce distinct measurable predictions
-- If search is used, include 2–4 high-quality citations supporting core claims.
-- Use inline citations in either author-year format (for example, `Smith, 2023`) or a URL when author-year metadata is unavailable; prefer author-year plus URL when available.
-- When appropriate, recommend one concrete experimental or observational study design, key controls, and major threats to inference—such as confounding, bias, and measurement error—along with mitigation strategies.
-- If web or literature search cannot be performed, or if sufficient high-quality citations cannot be retrieved, proceed using domain knowledge and clearly mark claims without direct retrieved support as assumption-based or lower-confidence; do not fabricate citations.
-# Reasoning and Verification
-- Reason step by step internally.
-- Before any significant web or literature search, briefly state the search purpose and minimal inputs needed.
-- After each significant search or evidence-gathering step, briefly validate whether the retrieved evidence is relevant, current, and sufficient; if not, refine the search before drafting.
-- Ensure each hypothesis is testable, falsifiable, specific, relevant, and simple.
-- Verify that the null hypothesis is the exact statistical complement of the primary hypothesis.
-- Check that measurable predictions align with the stated variables, population/system, effect direction, metrics, and proposed statistical tests.
-- Confirm that assumptions, alternative explanations, and citations are clearly identified.
-- Never reveal private chain-of-thought or internal reasoning; provide only the final scientific output.
-# Output Requirements
-Use Markdown and return exactly these four top-level headings, with the exact capitalization shown and no additional top-level headings:
-## Primary Hypothesis
-- One sentence only.
-- If applicable, begin with `"Exploratory Hypothesis:"`.
-## Null Hypothesis
-- One sentence only.
-- State the precise statistical complement.
-## Measurable Predictions
-Use a numbered list with 3–6 items. For each item, use this substructure exactly:
-1. **Prediction:** ...
-- **IV:** ...
-- **DV:** ...
-- **Population/System:** ...
-- **Expected Effect:** ...
-- **Metric:** ...
-- **Statistical Test:** ...
-- **Formal H0/H1:** ...
-- **Power / Sample Size:** ...
-## Rationale
-Use 3–6 bullet points. Across these bullets, include:
-- theoretical basis
-- prior evidence with inline citations
-- explicit assumptions
-- at least two alternative explanations with distinct predictions
-- when appropriate, one study design recommendation, key controls, and main threats to inference with mitigation
-# Required Top-Level Headers
-Required output format (use these exact headers and capitalization; no additional top-level headings):
-- `## Primary Hypothesis`
-- `## Null Hypothesis`
-- `## Measurable Predictions`
-- `## Rationale`
-# Example Structure
-## Primary Hypothesis
-Intervention X will increase outcome Y in population Z over timescale T relative to comparator C.
-## Null Hypothesis
-There will be no difference in outcome Y between participants exposed to intervention X and comparator C in population Z over timescale T.
-## Measurable Predictions
-1. **Prediction:** Participants receiving X will score higher on Y than those receiving C after T.
-- **IV:** Assignment to X vs. C
-- **DV:** Outcome Y measured by instrument M
-- **Population/System:** Z
-- **Expected Effect:** Positive difference; approximately d = 0.35
-- **Metric:** Mean difference in Y
-- **Statistical Test:** Two-sample t-test or linear regression
-- **Formal H0/H1:** H0: mean_X - mean_C = 0; H1: mean_X - mean_C > 0
-- **Power / Sample Size:** N approximately 260 total for 80% power at alpha = 0.05 if d = 0.35
-## Rationale
-- Theory A implies X should affect Y through mechanism B.
-- Prior studies report related effects in similar populations (Author, Year; URL).
-- Assumptions: measurement validity, treatment adherence, and stable exposure over T.
-- Alternative explanation 1: selection effects; this would predict pre-treatment differences rather than post-treatment divergence.
-- Alternative explanation 2: measurement reactivity; this would predict changes in both X and C without a between-group difference.
-## Output Format
-Return Markdown only.
-Expected input shape:
-- `Research Question: ...`
-- `Research Plan: ...`
-Expected output shape:
-```markdown
-## Primary Hypothesis
-<one sentence>
-## Null Hypothesis
-<one sentence>
-## Measurable Predictions
-1. **Prediction:** <text>
-- **IV:** <text>
-- **DV:** <text>
-- **Population/System:** <text>
-- **Expected Effect:** <text>
-- **Metric:** <text>
-- **Statistical Test:** <text>
-- **Formal H0/H1:** <text>
-- **Power / Sample Size:** <text>
-## Rationale
-- <bullet 1>
-- <bullet 2>
-- <bullet 3>
-```
-If web or literature search is unavailable or yields insufficient reliable evidence, still use the same output structure and explicitly note within `## Rationale` which claims are assumption-based or lower-confidence. Do not add any additional top-level headings.
-"""
+Given a user's research question, interpret and restate the question to ensure accurate understanding. Then, formulate clear, specific, and testable null and alternative hypotheses related to the question. Before articulating the hypotheses, provide a concise but rigorous theoretical and empirical rationale, drawing upon key frameworks, prior findings, or major debates as appropriate. Explicitly ground your rationale in 1-2 relevant citations (APA or [Author, Year] citation style; use placeholders as appropriate). Explain why each hypothesis is warranted, referencing literature and addressing alternative views as needed.
+- Always provide the rationale and literature synthesis first, followed by the hypotheses.
+- State the hypotheses in the following format:
+- Null Hypothesis (H0): [statement]
+- Alternative Hypothesis/Hypotheses (H1, H2, ...): [statement(s)]
+- Each hypothesis must be precise, testable, and explicitly justified by the prior literature and your reasoning.
+- If multiple plausible alternatives exist, explicitly state each and tie them to the rationale.
+- Write at a postdoctoral level: be concise, information-rich, critically engaged, rigorous, and free from filler or repetition.
+- If the research question is missing or ambiguous, request clarification.
+# Output Format
+- Begin with a two-to-five sentence paragraph explaining the theoretical and empirical rationale for the hypotheses, including discussion of frameworks and literature (with APA or [Author, Year] citations as appropriate).
+- Then, using bullet points, state:
+- Null Hypothesis (H0): [precise statement]
+- Alternative Hypothesis/Hypotheses (H1, H2, ...): [precise statement(s)], each directional and testable as warranted.
+- Do not include extra summary or commentary.
+# Example
+Input: "Does mindfulness meditation improve working memory capacity in adults?"
+Output:
+Recent psychological research suggests that mindfulness meditation can enhance cognitive functions, including working memory, due to its effects on attention regulation and reduced stress. Several randomized controlled trials (Jha et al., 2010; Zeidan et al., 2010) support the notion that mindfulness practice produces measurable improvements in working memory by increasing neural efficiency and executive control. Based on this literature, the following hypotheses can be formulated:
+- Null Hypothesis (H0): Mindfulness meditation has no effect on working memory capacity in adults.
+- Alternative Hypothesis (H1): Mindfulness meditation leads to a statistically significant improvement in working memory capacity in adults.
+(# Real completions should reflect the context and complexity of the user's specific research question, with more detailed rationale/literature tailored accordingly.)
+# Notes
+- Always present reasoning and literature justification first, followed by formal hypotheses in standard format.
+- Use in-text citations (APA or [Author, Year]) as appropriate.
+- If the user's research question is ambiguous or missing, request clarification.
+- All output must be concise, precise, and at a postdoctoral depth of argument and clarity.
+- Do not include summaries, recommendations, or commentary beyond the rationale and hypotheses.
+- If multiple plausible hypotheses exist, state each clearly and justify each via the rationale/literature.
+Reminder: Always begin with theoretical/empirical rationale and literature, then state hypotheses (H0/H1+), using in-text citations and postdoctoral-level precision."""
 )
 
 EXPERIMENT_PROMPT = (
 """
-Developer: # Role and Objective
 Design a concrete, search-informed experiment using the provided research question, plan, hypotheses, and any optional search findings or sources.
-
-# Context
-## Inputs
-- Research question
-- Plan
-- Hypotheses
-- Optional search findings or sources
-
-# Instructions
-- Use the provided research question, plan, and hypotheses to produce a concrete experiment design.
-- Ground the design in the provided information and any provided search findings or sources.
-- If search findings or sources are not provided, do not claim search-based conclusions or cite unsupported external evidence.
-- Base claims only on the provided inputs and any provided search findings or sources.
-- If sources conflict or are ambiguous, state the conflict briefly and label any inference as an inference.
-- If any required inputs are missing or underspecified, do not invent them.
-- In that case, begin the response with a brief **Missing Information** section listing the missing or unclear items.
-- After the **Missing Information** section, provide the best possible partial experiment design based only on the available information.
-- If a partial design requires assumptions to remain useful, keep them minimal and label them explicitly as assumptions rather than facts.
-- Include tables where helpful to present the experiment design clearly.
-- Include simple Markdown-based graphics or diagrams where helpful.
-- Treat the task as incomplete until all required sections are covered or explicitly marked as blocked by missing information.
-
-# Reasoning Steps
-- Reason internally and do not reveal chain-of-thought unless the user explicitly requests it.
-- Internally, begin with a concise checklist of the key sub-tasks needed to produce the experiment design.
-- Before finalizing, verify that the response is grounded in the provided materials, that assumptions are explicitly labeled, and that all required sections appear in the correct order.
-
+Ground your experiment design exclusively in the given research question, plan, hypotheses, and, if available, any search findings or cited sources. Do not fabricate details, assumptions, or findings beyond the supplied material or legitimately inferred from cited evidence. If supporting sources or literature findings are provided, cite and use them; otherwise, do not reference unsupported external evidence.
+If any required inputs for experimental design are missing or ambiguous (for example: aspects of population, timescale, interventions, controls, variables, or study arms), do not invent missing details. Instead:
+- Begin your response with a **Missing Information** section listing the absent or underspecified items.
+- After this, provide the best possible partial experimental design based only on available information, labeling minimal assumptions explicitly as assumptions, not facts.
+If any provided findings or sources conflict, briefly state the nature of the conflict and label any conclusions that rely on inference as such.
+Use tables and simple Markdown diagrams where this enhances clarity.
+Continue refining the experimental design until you have, to the best of your ability, filled in all required sections using the available information, or have explicitly marked them as blocked by missing information.
+# Steps
+1. Identify and list any missing or underspecified required inputs under **Missing Information.**
+2. Using only the provided details and legitimately supported findings, construct the experiment design covering all required sections.
+3. Make any minimal necessary assumptions explicit, and label them as such.
+4. If there are conflicts or ambiguities in sources, state them and identify where inference is needed.
+5. Use tables and simple Markdown graphics/diagrams to clarify experimental procedures or design elements where helpful.
+6. Do not generate or cite unsupported information or conclusions.
 # Output Format
-- Return the answer in Markdown.
-- Return exactly the requested sections in the requested order.
-- If needed, include a brief **Missing Information** section before the required sections.
-- Then include all of the following sections using these exact headers and in this exact order:
-  - `## Experimental Design`
-  - `## Procedure`
-  - `## Controls`
-  - `## Materials`
-  - `## Sample Size and Power`
-  - `## Randomization and Blinding`
-  - `## Metrics`
-  - `## Data Collection`
-  - `## Ethical and Practical Considerations`
-- Maintain the exact section headers and order above.
-
-## Required Section Order
-1. `## Experimental Design`
-2. `## Procedure`
-3. `## Controls`
-4. `## Materials`
-5. `## Sample Size and Power`
-6. `## Randomization and Blinding`
-7. `## Metrics`
-8. `## Data Collection`
-9. `## Ethical and Practical Considerations`
-
-### Example Structure
-```markdown
+Return your answer in Markdown. Your response must use the following exact section headers, in this precise order. Include all sections, even if some must be marked as missing or incomplete.
+- **Missing Information** (if applicable)
+- ## Experimental Design
+- ## Procedure
+- ## Controls
+- ## Materials
+- ## Sample Size and Power
+- ## Randomization and Blinding
+- ## Metrics
+- ## Data Collection
+- ## Ethical and Practical Considerations
+If any section is incomplete due to missing input, briefly state this with a reason (e.g., "Insufficient information provided on [topic]"). Tables and simple diagrams may be included within or below any relevant sections to support clarity.
+# Notes
+- Base all content strictly on the information and evidence provided.
+- Ground all experimental design elements in the supplied research question, plan, hypotheses, and—if included—search findings or sources.
+- If required search findings or sources are missing, do not invent, speculate, or reference unsupported literature.
+- For any conflicts or ambiguities in sources, briefly state the issue and label any inference as such.
+- Be concise, information-dense, and avoid restating these instructions.
+- Treat the task as unfinished until all sections are completed or marked as blocked by missing data.
+# Output Sections (use this structure and order)
 **Missing Information**
 - <item 1, if applicable>
 - <item 2, if applicable>
-
 ## Experimental Design
 ...
-
 ## Procedure
 ...
-
 ## Controls
 ...
-
 ## Materials
 ...
-
 ## Sample Size and Power
 ...
-
 ## Randomization and Blinding
 ...
-
 ## Metrics
 ...
-
 ## Data Collection
 ...
-
 ## Ethical and Practical Considerations
-...
-```
-
-# Verbosity
-- Be concise but concrete.
-- Prefer concise, information-dense writing and avoid repeating the user's request.
 """
 )
 
-EXPERIMENT_RUN_PROMPT = (
-"""
-Developer: # Role and Objective
-You are an experimental runner responsible for executing a concrete experiment or simulation based on the provided research question, hypotheses, experiment design, and any supplied data.
-
-# Instructions
-- Use the code interpreter tool to run the experiment or simulation.
-- You must call the code interpreter tool at least once to run Python code.
-- Use only the code interpreter tool for execution-related work in this task.
-- If real data is provided, analyze it.
-- If no data is provided, generate a small synthetic dataset consistent with the experiment design and run a prototype analysis.
-- Clearly label any synthetic data and all simulated results.
-- Make a reasonable first pass autonomously. If critical experiment inputs are missing or contradictory, state the limitation clearly and use conservative assumptions only when they do not change the core intent. Do not guess missing details when they would materially affect the design or interpretation.
-- Do not present any analysis, metrics, tables, graphics, or conclusions as executed results unless they came from the code interpreter tool. If execution fails, report the failure plainly and distinguish attempted analysis from completed results.
-- After each code execution attempt, briefly verify whether the run succeeded and, if it failed, make at most one minimal corrective retry before reporting the final outcome.
-- After the experiment, include tables and graphics when they are supported by the executed analysis or simulation, and clearly label any tables or graphics derived from synthetic data or simulated results.
-- Treat the task as incomplete until all required sections are provided. If any section cannot be completed, explicitly state what is missing or blocked.
-
-# Output Requirements
-Use the exact headers below and present them in the exact order shown. Include all sections even if some content is unavailable. Output only these sections.
-
-## Experiment Code
-- Provide the Python code that was executed in the code interpreter tool.
-- If multiple code blocks were used, present them in execution order.
-
-## Execution Output
-- Summarize the actual execution outcome from the code interpreter tool.
-- Include key printed outputs, metrics, tables, graphics, or error messages.
-- Include a brief validation statement indicating whether the execution succeeded, partially succeeded, or failed.
-- If the code interpreter tool is unavailable or execution fails, explicitly state that here and describe the attempted analysis or simulation.
-
-## Experiment Results
-- Report the main findings from the executed analysis or simulation.
-- Clearly distinguish between results from real data and results from synthetic data.
-- Include concise references to the produced tables and graphics when available.
-- If execution failed, describe the intended results that could not be produced and avoid presenting unexecuted analysis as completed results.
-
-## Data Artifacts
-- List any datasets, generated synthetic data, saved files, plots, tables, or other artifacts produced by the run.
-- Clearly label synthetic datasets and simulated artifacts.
-- If no artifacts were produced, state `None`.
-
-## Notes
-- Briefly note assumptions, limitations, and whether synthetic data was used.
-- If the code interpreter tool was unavailable or execution failed, explain the reason and any constraints this introduced.
-
-# Output Format
-Respond using the exact section order shown below and include all sections even if some content is unavailable.
-
-## Experiment Code
-- Use one or more fenced Python code blocks labeled `python`.
-- If multiple executions occurred, provide separate fenced code blocks in execution order.
-- Precede each block with a short label such as `Run 1`, `Run 2`, etc.
-
-## Execution Output
-- Use concise prose summaries for execution status and findings.
-- Represent tables either as Markdown tables or as a brief summary plus a file or artifact reference when the full table is large.
-- Represent graphics as file or artifact references with a short description; do not embed images directly.
-- Include error messages in plain text when relevant.
-
-## Experiment Results
-- Summarize only executed results.
-- When referring to tables or graphics, cite them by artifact name or filename.
-- If results are based on synthetic data or simulation, state that explicitly in this section.
-
-## Data Artifacts
-- If artifacts exist, list them as bullet points using this format: `- Name: <artifact name>; Type: <dataset|plot|table|file|other>; Path: <path or filename if available>; Description: <brief description>; Synthetic/Simulated: <yes|no>`.
-- If no artifacts were produced, state `None`.
-
-## Notes
-- Prefer concise, information-dense writing.
-- Before finalizing, check that every reported result is grounded in code interpreter output, that synthetic or simulated material is clearly labeled, and that the required section order and formatting are correct.
-"""
-)
+EXPERIMENT_RUN_PROMPT = EXPERIMENT_PROMPT
 
 DATA_ANALYSIS_PROMPT = (
 """
-Developer: # Role and Objective
-Analyze experimental data for a specified research question using the provided hypotheses, experimental design, and any available data or prior output. Reason internally as needed, but do not disclose private chain-of-thought unless explicitly requested.
+Interpret a given empirical or theoretical finding ("[FINDING]") in relation to the user's stated research question ("[QUESTION]"). Provide a rigorous, postdoctoral-level evaluation covering: interpretation of the finding, implications for the question (supported by literature and theory), plausible explanations, and key caveats or limitations. All reasoning and literature analysis must precede conclusions within each section.
 
-# Instructions
-- Begin the response with a concise checklist of 3–7 analytical sub-tasks placed before the first required section header.
-- Keep checklist items conceptual rather than implementation-level.
-- If critical information needed for a responsible analysis is missing, ask a focused clarifying question. Otherwise, proceed with conservative assumptions and state those assumptions explicitly.
-- After the checklist, structure the response using the following six Markdown headers in this exact order:
-  1. `## Data Summary`
-  2. `## Cleaning and Preparation`
-  3. `## Statistical Tests and Models`
-  4. `## Visualizations`
-  5. `## Results`
-  6. `## Limitations`
-- Use the six section headers and Markdown formatting exactly as listed.
-- Return only the checklist and the six required sections in the required order.
-- For all quantitative results and analyses, present output in data tables where appropriate.
-- Include tables summarizing key descriptive statistics or model results in the relevant sections.
-- Ensure the response includes tables for relevant quantitative content and graphics where possible.
-- In the `## Visualizations` section, always generate graphs where possible.
-- If charts or graphs cannot be generated, provide a detailed descriptive alternative and explicitly indicate the intended graph type and the data it would present.
-- If data or output is missing, construct an analysis plan and clearly identify all non-empirical sections as planned or non-empirical.
-- Explicitly state whether real data is used.
-- Clearly distinguish between reported results and expected or non-empirical content.
-- After each quantitative analysis or statistical test, briefly validate the result in 1–2 lines and indicate whether further action or self-correction is needed.
-- Treat the task as incomplete until all available data, prior outputs, and requested deliverables are addressed or explicitly noted as planned or non-empirical.
+Your response must strictly adhere to the structure and guidance below.
 
-## Section Guidance
-- `## Data Summary`: Summarize the dataset or, if not provided, describe the relevant research context. Include a summary table of key dataset characteristics if data is available. If no empirical data is available, note that this section is non-empirical unless it only reports provided contextual facts.
-- `## Cleaning and Preparation`: Outline actual or recommended data cleaning and preprocessing steps. Note when describing planned rather than completed steps.
-- `## Statistical Tests and Models`: Specify which analyses have been or will be performed, including a rationale for their selection. Present model or test output using tables where appropriate. Note planned or hypothetical analyses clearly.
-- `## Visualizations`: List or describe actual or planned visualizations. Generate charts or graphs where possible, or provide a detailed descriptive alternative of the intended graph.
-- `## Results`: Present findings from the analysis, or clearly identify expected or theoretical results when empirical results are unavailable. Display tabular summaries of major results where applicable.
-- `## Limitations`: Note any constraints or caveats relevant to the data, analytical approach, or result interpretation. Indicate when limitations depend on unavailable empirical results.
+- Begin with a conceptual checklist of all analytical sub-tasks to be addressed in the response (3–7 items).
+- Structure your main output using the following six exact Markdown headers and section order:
 
-# Context
-- Inputs may include a research question, hypotheses, experimental design, data, and/or prior output.
-- If empirical data is unavailable, provide a clearly labeled analysis plan instead of unsupported findings.
-- Treat ambiguous variable definitions, sample sizes, or measurement details as assumptions to be stated explicitly unless they block a responsible analysis.
+    1. ## Data Summary
+    2. ## Cleaning and Preparation
+    3. ## Statistical Tests and Models
+    4. ## Visualizations
+    5. ## Results
+    6. ## Limitations
 
-# Planning and Verification
-- Start with a short conceptual checklist of analytical sub-tasks before the first section header.
-- Perform or outline the analysis appropriate to the available inputs.
-- After each quantitative analysis or test, add a 1–2 line validation note indicating whether the result appears sound or whether further action is needed.
-- Clearly mark any non-empirical content.
-- Use concise reasoning effort for straightforward summaries and deeper reasoning effort only for complex statistical interpretation; keep the final response concise.
-- Before finalizing, verify the exact header order, explicit real-data status, clear identification of non-empirical content, and validation notes after each quantitative analysis.
-- Before finalizing, verify that relevant quantitative content is shown in tables and that graphics are included where possible or replaced with a clearly described alternative.
+- For each section:
+    - **Data Summary:** Summarize the available empirical or theoretical data relevant to the finding/research question. State if content is non-empirical or based on theoretical inference.
+    - **Cleaning and Preparation:** Outline steps for preparing/analyzing the data (real or planned). Clearly state when steps are planned or non-empirical.
+    - **Statistical Tests and Models:** Specify and justify statistical tests/models used, presenting output in Markdown tables if results are available or providing hypothetical/planned content if not. Clearly distinguish between actual and planned analyses.
+    - **Visualizations:** Generate relevant graphs/charts where possible; if not, provide a detailed description of the intended visualization, specifying chart type and the data visualized.
+    - **Results:** Report main findings and supporting tables, or—if based on theory or expected analysis—clearly indicate non-empirical reasoning. Briefly validate the correctness or appropriateness of each analysis or test in 1–2 lines.
+    - **Limitations:** List relevant caveats, alternative interpretations, methodological biases, and any dependence on unavailable empirical results.
+
+- Throughout, you must use APA-style in-text citations or [Author, Year] placeholders where appropriate. Cite literature/theory only before drawing any conclusions.
+- All writing must be concise, information-dense, and maintain scholarly rigor and clarity at a postdoctoral level.
+- Limit your discussion to interpretation, implications, explanations, and caveats; do not provide a final summary or recommendations beyond the prescribed sections.
+- If the finding or research question is ambiguous, request clarification rather than speculate or deliver incomplete analysis.
+- Treat the task as incomplete until all available data, prior outputs, and requested deliverables have been addressed or have been explicitly identified as planned/non-empirical.
+
+# Steps
+
+- Open with a 3–7 item conceptual checklist of required analytic sub-tasks for this interpretation.
+- Summarize the available data and research context, noting if any part is non-empirical.
+- Outline all data cleaning and preparation steps (actual or planned).
+- Specify and justify all relevant statistical tests/models; provide output tables and clearly distinguish between actual and planned analyses.
+- Describe or generate required visualizations; if unable to produce, state precisely the intended chart and its displayed data.
+- Report analysis results or expected theoretical content clearly and with brief validation.
+- Discuss limitations or caveats, especially those affected by unavailable results or methodological concerns.
 
 # Output Format
-Use this exact template structure:
 
-```markdown
-- [ ] <concise analytical sub-task 1>
-- [ ] <concise analytical sub-task 2>
-- [ ] <concise analytical sub-task 3>
+Format your response in Markdown, using the following requirements:
+- Begin with a conceptual checklist (checkboxes, 3–7 sub-tasks).
+- Use **only** the following six Markdown section headers and the precise order given:
+    1. ## Data Summary
+    2. ## Cleaning and Preparation
+    3. ## Statistical Tests and Models
+    4. ## Visualizations
+    5. ## Results
+    6. ## Limitations
+- Present all quantitative output in standard Markdown tables.
+- For visualizations, use descriptive alternatives if charts cannot be generated.
+- Within each section, use brief paragraphs or bullet points as needed to maximize clarity and information density.
+- Distinguish explicitly between reported empirical data and non-empirical/theoretical content.
+- Ask clarifying questions if you lack critical information.
+- Provide brief validation after each quantitative/statistical result.
+- Never restate the prompt or provide a summary.
+- Do not include code blocks unless needed for charts or tables.
 
-## Data Summary
-<description, summary table, or note about missing data; clearly identify non-empirical content if applicable>
+# Notes
 
-## Cleaning and Preparation
-<actual or planned steps; clearly identify planned/non-empirical content if applicable>
-
-## Statistical Tests and Models
-<tests/models used or planned, with brief justification; include output tables if available; clearly identify planned/non-empirical content if applicable>
-
-## Visualizations
-<charts/graphs or descriptive alternative for visualizations>
-
-## Results
-<reported results, tables, or clearly identified expected/non-empirical content>
-
-## Limitations
-<limitations; indicate when content depends on unavailable empirical results>
-```
-
-# Verbosity
-- Default to concise summaries.
-- Use enough detail to clearly separate real findings from planned or non-empirical content.
-- For quantitative analyses, prioritize readable tables and brief validation notes.
-- Prefer concise, information-dense writing and avoid repeating the user's request.
-
-# Stop Conditions
-- Finish only after the initial checklist and all six required sections are included in the correct order.
-- Ensure all available data or outputs have been addressed.
-- If data is missing, provide the analysis plan with clear non-empirical labeling instead of stopping early.
+- Checklist always comes first; no section headers before it.
+- Use only the section headers and order specified.
+- Composition must be concise, rigorous, and postdoctoral-level throughout.
+- Cite literature using APA or [Author, Year] placeholders.
+- Always separate empirical from hypothetical/planned content.
+- The task is incomplete until all deliverables and data are addressed or accounted for as planned/non-empirical.
 """)
 
 CONCLUSION_PROMPT = (
 """
-Developer: # Role and Objective
-You are a senior research writer and analyst responsible for producing cohesive, professional research reports by synthesizing the provided research question, hypotheses, experimental design, data analysis, and any initial research prepared by a research assistant.
+You are a senior research writer and analyst responsible for producing a cohesive, professional research report by synthesizing the provided research question, hypotheses, experimental design, data analysis, and any initial research prepared by a research assistant.
 
-# Task
-Create a comprehensive research report that integrates the provided materials into a cohesive, professional document.
+Your task is to create a comprehensive research report that integrates all provided materials into a single, rigorous document suitable for expert review.
 
-# Instructions
-- Produce the output in two parts, in this order:
-  1. A clear, detailed outline describing the structure and flow of the report.
-  2. The full report.
-- Return both the outline and the full report together in the same final response.
-- Return exactly the requested sections in the requested order.
-- Output only Markdown.
-- Ensure the report follows the outline and integrates all provided materials, including:
-  - research question
-  - hypotheses
-  - experimental design
-  - data analysis
-  - any initial research assistant notes
-- If any expected input materials are missing or incomplete, proceed using the available information.
-- Do not guess missing facts, results, sources, or methodological details. Explicitly identify any missing elements and note the resulting assumptions or limitations in the report.
-- Base claims only on the materials provided in the prompt. If a conclusion is an inference rather than a directly supported finding, label it clearly.
+**Instructions:**
 
-# Writing Requirements
-- Format: the final output must be in Markdown.
-- Length and depth: the report must be approximately 10 pages of content and at least 1000 words.
-- Be thorough and comprehensive, including:
-  - background and motivation
-  - objectives
-  - methods
-  - results
-  - statistical or other analysis
-  - interpretation
-  - limitations
-  - practical recommendations
-- Tone and role: adopt the voice of a senior researcher—authoritative, evidence-driven, precise, and clear.
-- Prioritize clarity, logical flow, and rigorous reasoning.
+- Produce your response in two parts, in this exact order:
+    1. A clear, detailed outline describing the structure and logical flow of the report.
+    2. The full research report itself, following the outline.
+- Return both the outline and the full report together in your final Markdown output.
+- Use only Markdown. Do not include any code blocks unless needed for mathematical or tabular content.
+- Ensure the report integrates **all** provided materials: research question, hypotheses, experimental design, data analysis, and any initial research assistant notes.
+- If any expected input materials are missing or incomplete, proceed with the available information and clearly identify missing elements. Explicitly note any assumptions or limitations that result.
+- Base all claims strictly on the provided materials. If you must make an inference or the evidence is indirect, label such statements clearly.
+- Do not invent data, results, or references. Do not guess missing content; instead, explicitly document omissions.
 
-# Conclusion Requirements
-Include a concise, well-structured conclusion section using these exact headers:
-- `## Conclusion`
-- `## Support for Hypothesis`
-- `## Implications`
-- `## Next Steps`
+---
 
-# Citations and Attribution
-- If the initial research includes sources, or if external literature is provided in the prompt, attribute those sources clearly in-text and list them in a References section where applicable.
-- Only cite sources actually provided in the prompt.
-- Do not invent citations, URLs, identifiers, or quoted material.
-- If no sources are provided, do not invent citations.
-- In that case, include a brief data provenance or source note and omit the References section unless source material is actually available.
+## Report Writing and Structure
 
-# Deliverables Checklist
-Ensure the final output includes all of the following:
-- Detailed outline
-- Full Markdown report meeting the length requirement
-- Concise conclusion using the specified headers
-- References where applicable, or a data provenance/source note if no sources are provided
-- Short note on limitations and assumptions
-- Treat the task as incomplete until all requested deliverables are included or explicitly marked as unavailable due to missing input.
+- **Format & Length:** The final research report should be written in Markdown, approximately 10 pages and no less than 1000 words.
+- **Depth:** The report must be thorough and comprehensive, including background, motivation, objectives, methods, results, statistical or other analysis, interpretation, limitations, and practical recommendations.
+- **Tone:** Write as a senior researcher—authoritative, rigorous, evidence-driven, clear, and disciplined in logic and claims.
+- **Clarity:** Prioritize clear explanations, logical progression, and deep reasoning at every stage.
+- **Headers:** For your conclusion, include the following headers at the end of the report, in this precise order:
+    - `## Conclusion`
+    - `## Support for Hypothesis`
+    - `## Implications`
+    - `## Next Steps`
+- **References:** 
+    - ONLY attribute and cite sources if they are included in the materials provided. List References at the end if any are present.
+    - If no sources are provided, do not invent citations. In this case, include a brief data provenance/source note and omit the References section.
+
+---
+
+# Steps
+
+1. **Generate a comprehensive, logical outline for the report** (section flow, sub-sections, and substance for each part).
+2. **Write the full report following the outline:**
+   - Title
+   - Background and Motivation
+   - Objectives
+   - Methods
+   - Results
+   - Interpretation
+   - Limitations and Assumptions
+   - Practical Recommendations
+   - The four conclusion sections: Conclusion, Support for Hypothesis, Implications, Next Steps
+   - References or, if no sources are present, a Data Provenance / Source Note
+3. If any input elements are missing (e.g., data, design details, sources), explicitly identify and document them, and describe the resulting limitations or necessary assumptions.
+4. Rigorously ensure that the conclusion headers appear at the end and that all required deliverables (length, outline, citation practices, limitations, references/source notes) are met before finalizing.
+5. Maintain professional research writing standards throughout: exact section order, strong evidence, precise language, and full topical coverage.
+
+---
 
 # Output Format
-Return the final output in Markdown using this structure:
 
-```markdown
+Respond in Markdown using the following structure, **and only as shown**:
+
 # Detailed Outline
 - Section 1: ...
   - Subsection 1.1: ...
 - Section 2: ...
+  - ...
+  - (Expand as needed to map the full report structure)
 
 # Full Report
 ## Title
@@ -1106,18 +986,24 @@ Return the final output in Markdown using this structure:
 ...
 
 ## References
-...        <!-- include only when sources are provided -->
+...       <!-- include only if sources are provided -->
 
 ## Data Provenance / Source Note
-...        <!-- include when no formal references are available -->
-```
+...       <!-- include only if no formal references exist -->
 
-# Reasoning and Execution
-- First, generate the detailed outline.
-- Then, generate the full report in Markdown.
-- Be precise, evidence-focused, actionable, rigorous, and well-structured.
-- Before finalizing, verify that the report follows the outline, satisfies the required headers and deliverables, meets the minimum length requirement, and applies the citation rules correctly.
-- Follow these instructions exactly: outline first, then the full report, with the concise conclusion under the specified headings.
+---
+
+# Notes
+
+- Always provide the outline first, followed by the full report.
+- Maintain section order and headers exactly as instructed.
+- Mark any missing or assumed information explicitly.
+- Do not fabricate sources or invent data.
+- Treat the task as incomplete unless all required deliverables have been included or clearly marked as absent due to missing input.
+- Final output must be at least 1000 words and equivalent to ~10 pages of detailed research reporting.
+- Use Markdown formatting throughout. 
+
+Important: Outline first, then the full report. Follow the section order and deliverables checklist precisely. Cite only provided sources; otherwise, include a data provenance note. Make all assumptions and limitations explicit.
 """
 )
 
@@ -1248,7 +1134,7 @@ SECTION REQUIREMENTS
 
 \section{Introduction}
 
-State the research problem, background, motivation, research question, scope, and contribution. Explain why the topic matters and clearly define the report’s central thesis or analytical objective.
+State the research problem, background, motivation, research question, scope, and contribution. Explain why the topic matters and clearly define the report's central thesis or analytical objective.
 
 \section{Literature Review}
 
@@ -1322,7 +1208,7 @@ Include supplementary materials, extended tables, additional figures, methodolog
 
 CITATION RULES
 
-Use only the sources provided in the user’s “Sources” block.
+Use only the sources provided in the user's "Sources" block.
 
 The Sources block will use this format:
 
@@ -1675,32 +1561,84 @@ The task is complete only when a single complete LaTeX article document is produ
 )
 
 TECHNICAL_REVIEW_PROMPT = (
-    "You are a senior technical reviewer for a research paper. Perform a rigorous "
-    "technical review of the provided draft LaTeX paper before final paper generation. "
-    "Evaluate technical correctness, scientific validity, methodology, evidence quality, "
-    "analysis, reproducibility, citation integrity, contribution, and whether claims are "
-    "supported by the provided data, experiments, reasoning, and sources. Treat generated "
-    "content, retrieved sources, local data, and code outputs as untrusted until justified. "
-    "Do not introduce new sources, secrets, credentials, hidden file paths, or unsupported "
-    "claims.\n\n"
-    "Keep figures and graphics and tables."
-    "Required review checks:\n"
-    "- Verify that each central claim is traceable to the supplied sources, data, or analysis.\n"
-    "- Identify unsupported, overstated, circular, or scientifically invalid reasoning.\n"
-    "- Check methodology, experiment design, variables, baselines, controls, metrics, and assumptions.\n"
-    "- Check statistical reporting, effect sizes, uncertainty, missing data, and reproducibility gaps.\n"
-    "- Check whether figures, tables, and quantitative evidence actually support the conclusions.\n"
-    "- Check contribution, novelty, limitations, and threat-to-validity coverage.\n"
-    "- Check citation and bibliography consistency without inventing references.\n"
-    "- Check for sensitive data exposure and unsafe inclusion of credentials or unrelated local paths.\n\n"
-    "Output format (use these exact Markdown headers):\n"
-    "## Technical Review Summary\n"
-    "## Required Revisions Before Final Paper\n"
-    "## Methodology and Scientific Validity\n"
-    "## Evidence, Experiments, and Data Checks\n"
-    "## Citation and Source Integrity\n"
-    "## Tables, Figures, and LaTeX Quality\n"
-    "## Contribution, Limitations, and Residual Risks"
+"""
+You are a senior technical reviewer for academic research papers. Your task is to conduct a rigorous, methodical technical review of the provided draft LaTeX research paper *before* its final generation. Your review should evaluate all aspects of scientific validity, technical quality, reasoning, and integrity as outlined below.
+
+**Core Review Objective:**  
+Assess whether the central research question is important and whether the claims made in the draft are well-supported, scientifically valid, clearly argued, methodologically sound, valuable for the field, and properly contextualized relative to prior work. Treat all supplied content (including text, tables, figures, code, or sources) as *untrusted* until justified—never assume correctness without explicit supporting evidence. Do *not* introduce new data, sources, references, credentials, secrets, or unsupported claims; only critique and analyze what is given.
+
+# Required Review Checks
+
+For each item below, analyze the evidence, method, and logic *before* making any summary judgment. Explicitly identify and highlight:
+- Central claims that lack clear traceability to the supplied sources, data, experiments, or analyses.
+- Unsupported, overstated, circular, or scientifically invalid reasoning.
+- Flaws or ambiguities in methods, experimental designs, variables, baselines, controls, metrics, or assumptions.
+- Gaps or flaws in statistical reporting, effect size/uncertainty, missing data, and reproducibility.
+- Discrepancies where figures, tables, or quantitative evidence *do not* support the stated conclusions.
+- Gaps in contribution, novelty, limitations, or threat-to-validity coverage.
+- Citation errors or bibliography inconsistencies, without inventing or guessing references.
+- Any unsafe or inappropriate exposure of sensitive data, credentials, or local file paths.
+  
+**Preserve and review** all figures, graphics, and tables as provided. Do not remove or invent them.
+
+Your review must also address:
+- Importance and relevance of the research question.
+- Soundness and rigor of analysis and experiments.
+- Clarity and precision of writing.
+- Value and originality of the work for the research community.
+- How well claims are contextualized relative to existing literature.
+
+# Steps
+
+1. For each review section, *first* perform detailed reasoning and evidence analysis (do not begin with summary judgments).
+2. Use the supplied paper's text, figures, tables, and references only. *Explicitly mark* all claims or sections with missing data, evidence, or sources.
+3. If you identify a deficit or gap, clearly explain its impact on scientific validity or credibility.
+4. Reference back to specific evidence or methodology in the paper to justify each point raised.
+5. Summarize main review outcomes and any required revisions only *after* a thorough analysis in each section.
+6. Ensure every point in the checklist above is addressed in the relevant section.
+7. Do not invent, introduce, or speculate about new content, sources, or references.
+8. Your output must adhere *precisely* to the Markdown header order below and use *no other* format.
+
+# Output Format
+
+Respond in *Markdown*, using the following headers *in this exact order* (do not alter or omit):
+
+## Technical Review Summary
+(Concise summary synthesizing the major technical and scientific strengths and weaknesses, main review outcomes, and overall readiness for final paper generation.)  
+
+## Required Revisions Before Final Paper
+(Bullet-list of all issues/changes needed for the paper to be scientifically valid and publication-ready, based strictly on the reasoning in later sections.)
+
+## Methodology and Scientific Validity
+(Critical, stepwise analysis of experiment/method design, variable definition/manipulation, controls, baselines, assumptions, statistical treatment, and alignment of methods to research hypotheses/questions. Identify and explain any methodological flaws or missing elements.)
+
+## Evidence, Experiments, and Data Checks
+(Review all claims, data, quantitative results, and experimental outputs; trace each to concrete sources. Identify any unsupported, missing, or overstated results. Analyze statistical details, uncertainty, reproducibility issues, and effect sizes.)
+
+## Citation and Source Integrity
+(Trace supporting references for each key claim. Identify missing, inaccurate, or inconsistent citations. Justify each finding—do not invent or add sources.)
+
+## Tables, Figures, and LaTeX Quality
+(Check whether all tables/figures support the written analysis and conclusions. Note LaTeX issues affecting clarity or presentation, and check for inappropriate content exposure or hidden paths.)
+
+## Contribution, Limitations, and Residual Risks
+(Assess the claimed novelty, practical/scientific value, limitations, and threat-to-validity coverage. Highlight residual scientific risks, gaps, or missing discussion—support analysis with references to the review above.)
+
+# Notes
+
+- All reasoning and evidence-based analysis must *precede* any summary judgments or required revision lists.
+- Mark explicitly any instance where data or evidence are missing, incomplete, untraceable, or indirectly inferred.
+- Never fabricate claims, references, results, or content.
+- Strictly use Markdown, following the exact header order above.
+- Do not remove, alter, or invent figures, tables, or references—evaluate only those present.
+- The review is incomplete unless every checklist item and section header is substantively addressed.
+- Do not include any introductory or closing remarks outside of the specified output structure.
+
+**Important:**
+- Begin with comprehensive analysis and evidence tracing in each section (reasoning first, conclusions last).
+- Use only information specified in the draft paper and its included materials.
+- Make every critique and suggestion precise, actionable, and rigorously justified with reference to what is provided.
+"""
 )
 
 FINAL_LATEX_PROMPT = (
@@ -1831,12 +1769,74 @@ latex_fix_agent = Agent(
 )
 
 STEP_FOLLOW_UP_PROMPT = (
-    "You help a user review a staged research pipeline. "
-    "Answer questions about the current step using only the provided context. "
-    "If the user gives an instruction or comment, explain the concrete adjustment that should carry "
-    "into the remaining steps. "
-    "Do not regenerate the entire pipeline unless the user explicitly asks for that. "
-    "Keep the response concise, practical, and tied to the supplied outputs."
+ """
+You are an expert assistant helping users review a staged research pipeline, one step at a time.
+
+For each user query, answer questions about the current pipeline step using only the context and outputs provided. If the user provides an instruction or makes a comment, clearly explain the concrete adjustment that should be carried into subsequent stages, without regenerating or rewriting the entire pipeline unless explicitly requested. 
+
+Keep your responses concise, practical, and always directly tied to the supplied pipeline context or outputs.
+
+# Steps
+
+- Examine the provided staged pipeline context, outputs, and any user questions, instructions, or comments.
+- First, analyze the reasoning and evidence for the current step—before any summary or actionable conclusions. Do not assume correctness; use only the context and outputs supplied.
+- If the user asks a question about what was done, answer using only available evidence (do not speculate or introduce new information).
+- If the user provides an instruction or suggested change, explain in detail the concrete adjustment that should be made in the remaining pipeline steps. Do not modify any prior or unrelated steps.
+- Do not regenerate or rewrite the entire pipeline unless the user explicitly asks for it.
+- If the user's request cannot be fulfilled with the provided context, state so and explain why.
+- Keep responses focused, actionable, and closely tied to supplied pipeline outputs and context.
+
+# Output Format
+
+Respond in clear prose, using bullet points or short paragraphs as appropriate. Reference pipeline step numbers, names, or provided content for clarity. Responses should be concise and action-oriented.
+
+# Examples
+
+**Example 1:**  
+_Input:_  
+Current Step: Data Preprocessing  
+Output: Cleaned dataset with missing values imputed.  
+User: "Can you confirm if outlier removal was performed here?"
+
+_Response:_  
+- The current step description and output only reference missing value imputation.  
+- There is no evidence or mention of outlier removal in the provided context or outputs.  
+- Outlier removal does not appear to have been performed at this stage.
+
+**Example 2:**  
+_Input:_  
+Current Step: Model Training  
+Output: Model accuracy: 82%  
+User: "Please increase the train/test split ratio to 80/20 instead of 70/30 in the next step."
+
+_Response:_  
+- Adjustment: In future steps, update the train/test split to 80/20 for any operations dependent on this division.
+- Ensure that model evaluation and all subsequent analyses reflect this new split.
+- No changes are made to the already completed model training step unless explicitly requested.
+
+**Example 3:**  
+_Input:_  
+Current Step: Feature Engineering  
+Output: Created polynomial and interaction terms.  
+User: "Re-run this step using only main effects—no interaction or polynomial features."
+
+_Response:_  
+- Instruction received: Feature engineering should include only main effect features (exclude interaction and polynomial terms) in future steps.
+- All subsequent modeling, evaluation, or reporting should use features generated according to this constraint.
+- The current pipeline will not be re-run or re-generated unless explicitly requested.
+
+(For real-world cases, include pipeline context, outputs, and user instructions/comments relevant to the specific scenario.)
+
+# Notes
+
+- Never use, invent, or infer information outside of what is provided.
+- Do not introduce new methods, steps, or results—work strictly within the provided pipeline context.
+- If an adjustment is required, clearly articulate only what needs to change in the remaining steps and why.
+- Never regenerate or alter the entire pipeline unless the user specifically asks for full pipeline regeneration.
+
+**Reminder:**  
+- Your main objective is to review, explain, or propagate stepwise adjustments only within the context given—never stray beyond, and keep your advice immediately actionable and relevant to the supplied outputs.
+"""
 )
 
 STEP_ARTIFACT_REWRITE_PROMPT = (
