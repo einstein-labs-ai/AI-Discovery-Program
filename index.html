@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Einsteinian labs Research</title>
+  <title>Einsteinian labs Research v0.1</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -294,7 +294,7 @@
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <div class="brand">Einsteinian labs Research</div>
+      <div class="brand">Einsteinian labs Research v0.1</div>
       <div class="tagline">Run all stages in `EinsteinResearch.py` and inspect each output with step tabs.</div>
 
       <label for="questionInput" class="label">Research Question</label>
@@ -320,6 +320,16 @@ Tip: type `/suggest <topic>` and Run to expand a rough idea into a full prompt."
         <option value="gpt-5-mini">gpt-5-mini</option>
         <option value="gpt-5-nano">gpt-5-nano</option>
       </select>
+
+      <label for="safetyLevelSelect" class="label">Bio/Chem Safety Level</label>
+      <select id="safetyLevelSelect">
+        <option value="1">1 - lowest risk</option>
+        <option value="2">2 - low risk</option>
+        <option value="3" selected>3 - moderate risk</option>
+        <option value="4">4 - high-risk warning</option>
+        <option value="5">5 - highest-risk warning</option>
+      </select>
+      <div class="hint">Level 5 is the highest bio/chemical risk warning level; it does not lower safeguards.</div>
 
       <label class="checkbox" for="generatePdfInput">
         <input id="generatePdfInput" type="checkbox">
@@ -393,6 +403,7 @@ Tip: type `/suggest <topic>` and Run to expand a rough idea into a full prompt."
     const dataInputEl = document.getElementById("dataInput");
     const saveDirInputEl = document.getElementById("saveDirInput");
     const modelSelectEl = document.getElementById("modelSelect");
+    const safetyLevelSelectEl = document.getElementById("safetyLevelSelect");
     const generatePdfInputEl = document.getElementById("generatePdfInput");
     const runBtnEl = document.getElementById("runBtn");
     const clearBtnEl = document.getElementById("clearBtn");
@@ -503,6 +514,10 @@ Tip: type `/suggest <topic>` and Run to expand a rough idea into a full prompt."
       if (pricing.estimated_total_cost_usd !== undefined) {
         lines.push(`est_cost: ${formatUsd(pricing.estimated_total_cost_usd)}`);
       }
+      if (state.result.safety_level) {
+        const safetyProfile = state.result.safety_profile || "n/a";
+        lines.push(`safety_level: ${state.result.safety_level} (${safetyProfile})`);
+      }
       if (state.result.data_note) {
         lines.push(`data_note: ${state.result.data_note}`);
       }
@@ -589,6 +604,7 @@ Tip: type `/suggest <topic>` and Run to expand a rough idea into a full prompt."
       dataInputEl.disabled = disabled;
       saveDirInputEl.disabled = disabled;
       modelSelectEl.disabled = disabled;
+      safetyLevelSelectEl.disabled = disabled;
       generatePdfInputEl.disabled = disabled;
       runBtnEl.disabled = disabled;
       clearBtnEl.disabled = disabled;
@@ -632,6 +648,7 @@ Tip: type `/suggest <topic>` and Run to expand a rough idea into a full prompt."
         questionInputEl.value = suggested;
         state.suggestion = suggested;
         state.selectedTab = "literature_view";
+        statusBarEl.textContent = "Suggested prompt generated. Review it above, then run the pipeline.";
       } catch (error) {
         setError(error.message || "Suggest request failed.");
       } finally {
@@ -660,6 +677,7 @@ Tip: type `/suggest <topic>` and Run to expand a rough idea into a full prompt."
         data: dataInputEl.value.trim(),
         save_dir: saveDirInputEl.value.trim(),
         model: modelSelectEl.value,
+        safety_level: Number(safetyLevelSelectEl.value),
         generate_pdf: generatePdfInputEl.checked
       };
 
