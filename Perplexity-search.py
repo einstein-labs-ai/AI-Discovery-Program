@@ -12,7 +12,7 @@ from typing import Any
 
 from perplexity import Perplexity
 
-DEFAULT_MODEL = os.getenv("PERPLEXITY_MODEL", "sonar-pro")
+DEFAULT_MODEL = os.getenv("PERPLEXITY_MODEL", "sonar-deep-research")
 DEFAULT_REF_RESULTS = int(os.getenv("PERPLEXITY_MAX_RESULTS", "8"))
 MAX_FILE_CHARS = int(os.getenv("PERPLEXITY_MAX_FILE_CHARS", "30000"))
 PROMPT_PREFIX = ">"
@@ -83,7 +83,7 @@ def _dedupe(items: list[str]) -> list[str]:
 
 def print_logo() -> None:
     print(ASCII_EINSTEIN_LOGO)
-    print("Einstein Search CLI")
+    print("Einstein Deep Search CLI")
     print(f"Model: {DEFAULT_MODEL}")
     print("Type /quit at any prompt to exit.")
 
