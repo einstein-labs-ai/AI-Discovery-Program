@@ -65,6 +65,38 @@ FALLBACK_MODELS = (
     "gpt-5-mini",
     "gpt-5-nano",
 )
+SUPPORTED_PERPLEXITY_MODELS = (
+    "sonar",
+    "sonar-pro",
+    "sonar-reasoning-pro",
+    "sonar-deep-research",
+)
+DEFAULT_PERPLEXITY_MODEL = "sonar-deep-research"
+CONFIGURED_PERPLEXITY_MODEL = os.getenv(
+    "PERPLEXITY_MODEL",
+    DEFAULT_PERPLEXITY_MODEL,
+)
+PERPLEXITY_MODEL_ALIASES = {
+    "default": DEFAULT_PERPLEXITY_MODEL,
+    "fast": "sonar",
+    "standard": "sonar",
+    "sonar": "sonar",
+    "sonar pro": "sonar-pro",
+    "sonar-pro": "sonar-pro",
+    "sonarpro": "sonar-pro",
+    "pro": "sonar-pro",
+    "reasoning": "sonar-reasoning-pro",
+    "reasoning pro": "sonar-reasoning-pro",
+    "sonar reasoning": "sonar-reasoning-pro",
+    "sonar reasoning pro": "sonar-reasoning-pro",
+    "sonar-reasoning": "sonar-reasoning-pro",
+    "sonar-reasoning-pro": "sonar-reasoning-pro",
+    "deep": "sonar-deep-research",
+    "deep research": "sonar-deep-research",
+    "sonar deep": "sonar-deep-research",
+    "sonar deep research": "sonar-deep-research",
+    "sonar-deep-research": "sonar-deep-research",
+}
 MODEL_PRICING_USD_PER_M_TOKENS = {
     "gpt-5.5": {"input": 5.00, "cached_input": 0.50, "output": 30.00},
     "gpt-5.5-pro": {"input": 30.00, "cached_input": None, "output": 180.00},
@@ -237,12 +269,12 @@ _SESSION_ENGINE_LOCK = threading.Lock()
 _SESSION_WARNING_SHOWN = False
 
 EINSTEINLABS_ASCII = r"""
- ______ _           _       _        _       _               
-|  ____(_)         | |     (_)      | |     | |             
-| |__   _ _ __  ___| |_ ___ _ _ __  | | __ _| |__  ___      
+ ______ _           _       _        _       _
+|  ____(_)         | |     (_)      | |     | |
+| |__   _ _ __  ___| |_ ___ _ _ __  | | __ _| |__  ___
 |  __| | | '_ \/ __| __/ _ \ | '_ \ | |/ _` | '_ \/ __|
-| |____| | | | \__ \ ||  __/ | | | || | (_| | |_) \__ \ 
-|______|_|_| |_|___/\__\___|_|_| |_||_|\__,_|_.__/|___/ 
+| |____| | | | \__ \ ||  __/ | | | || | (_| | |_) \__ \
+|______|_|_| |_|___/\__\___|_|_| |_||_|\__,_|_.__/|___/
 """
 CLI_FRAME_WIDTH = 76
 ANSI_RESET = "\033[0m"
@@ -303,10 +335,20 @@ def _print_einsteinlabs_header(subtitle: str = "") -> None:
 
 def _print_startup_menu(
     model: str,
+    perplexity_model: str = DEFAULT_PERPLEXITY_MODEL,
     safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
 ) -> None:
     _print_einsteinlabs_header("AI Research + Lab Workflows")
     print(_style_cli(_frame_text(f" Active model: {model}"), ANSI_GREEN))
+    print(
+        _style_cli(
+            _frame_text(
+                " Perplexity model: "
+                f"{_normalize_perplexity_model_name(perplexity_model)}"
+            ),
+            ANSI_GREEN,
+        )
+    )
     print(
         _style_cli(
             _frame_text(
@@ -911,7 +953,7 @@ Your task is to create a comprehensive research report that integrates all provi
     - `## Support for Hypothesis`
     - `## Implications`
     - `## Next Steps`
-- **References:** 
+- **References:**
     - ONLY attribute and cite sources if they are included in the materials provided. List References at the end if any are present.
     - If no sources are provided, do not invent citations. In this case, include a brief data provenance/source note and omit the References section.
 
@@ -1001,7 +1043,7 @@ Respond in Markdown using the following structure, **and only as shown**:
 - Do not fabricate sources or invent data.
 - Treat the task as incomplete unless all required deliverables have been included or clearly marked as absent due to missing input.
 - Final output must be at least 1000 words and equivalent to ~10 pages of detailed research reporting.
-- Use Markdown formatting throughout. 
+- Use Markdown formatting throughout.
 
 Important: Outline first, then the full report. Follow the section order and deliverables checklist precisely. Cite only provided sources; otherwise, include a data provenance note. Make all assumptions and limitations explicit.
 """
@@ -1564,7 +1606,7 @@ TECHNICAL_REVIEW_PROMPT = (
 """
 You are a senior technical reviewer for academic research papers. Your task is to conduct a rigorous, methodical technical review of the provided draft LaTeX research paper *before* its final generation. Your review should evaluate all aspects of scientific validity, technical quality, reasoning, and integrity as outlined below.
 
-**Core Review Objective:**  
+**Core Review Objective:**
 Assess whether the central research question is important and whether the claims made in the draft are well-supported, scientifically valid, clearly argued, methodologically sound, valuable for the field, and properly contextualized relative to prior work. Treat all supplied content (including text, tables, figures, code, or sources) as *untrusted* until justified—never assume correctness without explicit supporting evidence. Do *not* introduce new data, sources, references, credentials, secrets, or unsupported claims; only critique and analyze what is given.
 
 # Required Review Checks
@@ -1578,7 +1620,7 @@ For each item below, analyze the evidence, method, and logic *before* making any
 - Gaps in contribution, novelty, limitations, or threat-to-validity coverage.
 - Citation errors or bibliography inconsistencies, without inventing or guessing references.
 - Any unsafe or inappropriate exposure of sensitive data, credentials, or local file paths.
-  
+
 **Preserve and review** all figures, graphics, and tables as provided. Do not remove or invent them.
 
 Your review must also address:
@@ -1604,7 +1646,7 @@ Your review must also address:
 Respond in *Markdown*, using the following headers *in this exact order* (do not alter or omit):
 
 ## Technical Review Summary
-(Concise summary synthesizing the major technical and scientific strengths and weaknesses, main review outcomes, and overall readiness for final paper generation.)  
+(Concise summary synthesizing the major technical and scientific strengths and weaknesses, main review outcomes, and overall readiness for final paper generation.)
 
 ## Required Revisions Before Final Paper
 (Bullet-list of all issues/changes needed for the paper to be scientifically valid and publication-ready, based strictly on the reasoning in later sections.)
@@ -1772,7 +1814,7 @@ STEP_FOLLOW_UP_PROMPT = (
  """
 You are an expert assistant helping users review a staged research pipeline, one step at a time.
 
-For each user query, answer questions about the current pipeline step using only the context and outputs provided. If the user provides an instruction or makes a comment, clearly explain the concrete adjustment that should be carried into subsequent stages, without regenerating or rewriting the entire pipeline unless explicitly requested. 
+For each user query, answer questions about the current pipeline step using only the context and outputs provided. If the user provides an instruction or makes a comment, clearly explain the concrete adjustment that should be carried into subsequent stages, without regenerating or rewriting the entire pipeline unless explicitly requested.
 
 Keep your responses concise, practical, and always directly tied to the supplied pipeline context or outputs.
 
@@ -1792,35 +1834,35 @@ Respond in clear prose, using bullet points or short paragraphs as appropriate. 
 
 # Examples
 
-**Example 1:**  
-_Input:_  
-Current Step: Data Preprocessing  
-Output: Cleaned dataset with missing values imputed.  
+**Example 1:**
+_Input:_
+Current Step: Data Preprocessing
+Output: Cleaned dataset with missing values imputed.
 User: "Can you confirm if outlier removal was performed here?"
 
-_Response:_  
-- The current step description and output only reference missing value imputation.  
-- There is no evidence or mention of outlier removal in the provided context or outputs.  
+_Response:_
+- The current step description and output only reference missing value imputation.
+- There is no evidence or mention of outlier removal in the provided context or outputs.
 - Outlier removal does not appear to have been performed at this stage.
 
-**Example 2:**  
-_Input:_  
-Current Step: Model Training  
-Output: Model accuracy: 82%  
+**Example 2:**
+_Input:_
+Current Step: Model Training
+Output: Model accuracy: 82%
 User: "Please increase the train/test split ratio to 80/20 instead of 70/30 in the next step."
 
-_Response:_  
+_Response:_
 - Adjustment: In future steps, update the train/test split to 80/20 for any operations dependent on this division.
 - Ensure that model evaluation and all subsequent analyses reflect this new split.
 - No changes are made to the already completed model training step unless explicitly requested.
 
-**Example 3:**  
-_Input:_  
-Current Step: Feature Engineering  
-Output: Created polynomial and interaction terms.  
+**Example 3:**
+_Input:_
+Current Step: Feature Engineering
+Output: Created polynomial and interaction terms.
 User: "Re-run this step using only main effects—no interaction or polynomial features."
 
-_Response:_  
+_Response:_
 - Instruction received: Feature engineering should include only main effect features (exclude interaction and polynomial terms) in future steps.
 - All subsequent modeling, evaluation, or reporting should use features generated according to this constraint.
 - The current pipeline will not be re-run or re-generated unless explicitly requested.
@@ -1834,7 +1876,7 @@ _Response:_
 - If an adjustment is required, clearly articulate only what needs to change in the remaining steps and why.
 - Never regenerate or alter the entire pipeline unless the user specifically asks for full pipeline regeneration.
 
-**Reminder:**  
+**Reminder:**
 - Your main objective is to review, explain, or propagate stepwise adjustments only within the context given—never stray beyond, and keep your advice immediately actionable and relevant to the supplied outputs.
 """
 )
@@ -1868,6 +1910,46 @@ def _normalize_model_name(model_name: str | None) -> str:
 
 def _recommended_models_text() -> str:
     return ", ".join(RECOMMENDED_MODELS)
+
+
+def _recommended_perplexity_models_text() -> str:
+    return ", ".join(SUPPORTED_PERPLEXITY_MODELS)
+
+
+def _unsupported_perplexity_model_message(model_name: str | None) -> str:
+    requested = (model_name or "").strip() or "<empty>"
+    return (
+        f"Unsupported Perplexity model '{requested}'. "
+        f"Supported Sonar models: {_recommended_perplexity_models_text()}."
+    )
+
+
+def _normalize_perplexity_model_name(model_name: str | None) -> str:
+    normalized = " ".join((model_name or "").strip().split())
+    if not normalized:
+        return DEFAULT_PERPLEXITY_MODEL
+
+    alias_key = normalized.lower()
+    alias = PERPLEXITY_MODEL_ALIASES.get(alias_key)
+    if alias:
+        return alias
+
+    dash_key = alias_key.replace(" ", "-")
+    alias = PERPLEXITY_MODEL_ALIASES.get(dash_key)
+    if alias:
+        return alias
+
+    if normalized in SUPPORTED_PERPLEXITY_MODELS:
+        return normalized
+
+    raise ValueError(_unsupported_perplexity_model_message(model_name))
+
+
+def _configured_perplexity_model_name() -> str:
+    try:
+        return _normalize_perplexity_model_name(CONFIGURED_PERPLEXITY_MODEL)
+    except ValueError:
+        return DEFAULT_PERPLEXITY_MODEL
 
 
 def _normalize_bio_chem_safety_level(level: object) -> int:
@@ -5032,34 +5114,53 @@ def run_interactive_research(
     )
 
 
-def run_lab_research(script_path: str | None = None) -> None:
+def run_lab_research(
+    script_path: str | None = None,
+    perplexity_model: str = DEFAULT_PERPLEXITY_MODEL,
+) -> None:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_script = script_path or os.path.join(base_dir, "Perplexity-search.py")
     if not os.path.exists(target_script):
         print(_style_cli(f">> Lab research script not found: {target_script}", ANSI_RED, ANSI_BOLD))
         return
 
+    selected_perplexity_model = _normalize_perplexity_model_name(perplexity_model)
     print(_style_cli(f">> Launching Lab Research from: {target_script}", ANSI_MAGENTA, ANSI_BOLD))
+    print(_style_cli(f">> Perplexity model: {selected_perplexity_model}", ANSI_YELLOW))
+    previous_argv = sys.argv[:]
+    previous_perplexity_model = os.environ.get("PERPLEXITY_MODEL")
     try:
+        os.environ["PERPLEXITY_MODEL"] = selected_perplexity_model
+        sys.argv = [target_script, "--model", selected_perplexity_model]
         runpy.run_path(target_script, run_name="__main__")
     except SystemExit:
         return
     except Exception as exc:
         print(_style_cli(f">> Lab research launch failed: {exc}", ANSI_RED, ANSI_BOLD))
+    finally:
+        sys.argv = previous_argv
+        if previous_perplexity_model is None:
+            os.environ.pop("PERPLEXITY_MODEL", None)
+        else:
+            os.environ["PERPLEXITY_MODEL"] = previous_perplexity_model
 
 
 def run_startup_menu(
     save_dir: str | None = None,
     model: str = DEFAULT_MODEL,
+    perplexity_model: str = DEFAULT_PERPLEXITY_MODEL,
     generate_pdf: bool = True,
     safety_level: int = DEFAULT_BIO_CHEM_SAFETY_LEVEL,
 ) -> None:
     selected_model = _normalize_model_name(model)
+    selected_perplexity_model = _normalize_perplexity_model_name(perplexity_model)
     selected_safety_level = _normalize_bio_chem_safety_level(safety_level)
 
     while True:
-        _print_startup_menu(selected_model, selected_safety_level)
-        raw_choice = _cli_input("Choose an option [0-3] (or /model, /safety):").strip()
+        _print_startup_menu(selected_model, selected_perplexity_model, selected_safety_level)
+        raw_choice = _cli_input(
+            "Choose an option [0-3] (or /model, /perplexity-model, /safety):"
+        ).strip()
         choice = raw_choice.lower()
 
         if not choice:
@@ -5079,7 +5180,7 @@ def run_startup_menu(
             )
             continue
         if choice == "2":
-            run_lab_research()
+            run_lab_research(perplexity_model=selected_perplexity_model)
             continue
         if choice == "3":
             host = _cli_input("Host [127.0.0.1]:") or "127.0.0.1"
@@ -5116,6 +5217,19 @@ def run_startup_menu(
             selected_model = _normalize_model_name(requested)
             print(_style_cli(f">> Model set to: {selected_model}", ANSI_YELLOW))
             continue
+        if choice == "/perplexity-model":
+            print(_style_cli(f">> Current Perplexity model: {selected_perplexity_model}", ANSI_YELLOW))
+            print(_style_cli(f">> Supported: {_recommended_perplexity_models_text()}", ANSI_YELLOW))
+            continue
+        if choice.startswith("/perplexity-model "):
+            requested = raw_choice.split(" ", 1)[1]
+            try:
+                selected_perplexity_model = _normalize_perplexity_model_name(requested)
+            except ValueError as exc:
+                print(_style_cli(f">> {exc}", ANSI_RED, ANSI_BOLD))
+                continue
+            print(_style_cli(f">> Perplexity model set to: {selected_perplexity_model}", ANSI_YELLOW))
+            continue
         if choice == "/safety":
             print(
                 _style_cli(
@@ -5135,7 +5249,13 @@ def run_startup_menu(
             )
             continue
 
-        print(_style_cli(">> Invalid option. Choose 0-3 or use /model or /safety.", ANSI_RED, ANSI_BOLD))
+        print(
+            _style_cli(
+                ">> Invalid option. Choose 0-3 or use /model, /perplexity-model, or /safety.",
+                ANSI_RED,
+                ANSI_BOLD,
+            )
+        )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -5154,6 +5274,15 @@ def _parse_args() -> argparse.Namespace:
         help=(
             f"Model for all chat, suggestion, and pipeline agents. Default: {DEFAULT_MODEL}. "
             f"Recommended: {_recommended_models_text()}."
+        ),
+    )
+    parser.add_argument(
+        "--perplexity-model",
+        default=_configured_perplexity_model_name(),
+        help=(
+            "Perplexity Sonar model for Lab Research. "
+            f"Default: {_configured_perplexity_model_name()}. "
+            f"Supported: {_recommended_perplexity_models_text()}."
         ),
     )
     parser.add_argument(
@@ -5179,9 +5308,18 @@ def _parse_args() -> argparse.Namespace:
         help="Prompt for inputs and run the pipeline.",
     )
 
-    subparsers.add_parser(
+    lab_parser = subparsers.add_parser(
         "lab",
         help="Launch the Perplexity-powered Lab Research workflow.",
+    )
+    lab_parser.add_argument(
+        "--perplexity-model",
+        dest="lab_perplexity_model",
+        default="",
+        help=(
+            "Override the Perplexity Sonar model for this Lab Research launch. "
+            f"Supported: {_recommended_perplexity_models_text()}."
+        ),
     )
 
     auto_parser = subparsers.add_parser(
@@ -5251,6 +5389,13 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = _parse_args()
     model_name = _normalize_model_name(args.model)
+    try:
+        perplexity_model_name = _normalize_perplexity_model_name(
+            getattr(args, "lab_perplexity_model", "") or args.perplexity_model
+        )
+    except ValueError as exc:
+        print(_style_cli(f">> {exc}", ANSI_RED, ANSI_BOLD))
+        sys.exit(2)
     generate_pdf = not args.no_pdf
     safety_level = _normalize_bio_chem_safety_level(args.safety_level)
 
@@ -5293,12 +5438,13 @@ if __name__ == "__main__":
             safety_level=safety_level,
         )
     elif args.mode == "lab":
-        run_lab_research()
+        run_lab_research(perplexity_model=perplexity_model_name)
     else:
         # Default to startup menu when no subcommand is provided.
         run_startup_menu(
             save_dir=args.save or None,
             model=model_name,
+            perplexity_model=perplexity_model_name,
             generate_pdf=generate_pdf,
             safety_level=safety_level,
         )
