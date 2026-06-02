@@ -876,3 +876,7 @@ For fully automated science coding agent, please use [Autocodex-sci](https://git
 
 ### 27. Version
 current version: 0.91
+
+## 28. Appreciations 
+- Many Thanks to [OpenAI](https://openai.com/)
+- Thanks for [anthropic](https://www.anthropic.com/)
