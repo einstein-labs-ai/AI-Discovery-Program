@@ -1,113 +1,140 @@
-# AI Discovery CLI
+# AI Discovery Manager CLI
 
-`AI Discovery CLI` is an npm/Node.js terminal interface for science workflows inspired by Codex-style slash commands and the local `EinsteinResearch.py` pipeline.
+Codex-style research CLI built on the OpenAI Agents SDK **manager pattern**: one trusted host agent owns the final answer and calls bounded specialist agents exposed as tools. The host process stays the only thing that writes to the local filesystem — it streams the final Markdown to stdout and saves it as an artifact.
 
-## Run
+## Features
 
-```powershell
-npm start
-```
+### Workflow commands
 
-One-shot examples:
+A manager agent orchestrates specialists and produces a Markdown research artifact. Each command targets a different section, except `run`, which drives the full pipeline:
 
-```powershell
-npm start -- "Can a new catalyst improve CO2 reduction yield?"
-npm start -- /research "Can a new catalyst improve CO2 reduction yield?"
-npm start -- /hypothesis "Can a new catalyst improve CO2 reduction yield?"
-npm start -- /experiment "Design a controlled catalyst screening experiment"
-npm start -- /writer "Draft a final-format paper from the current experiment"
-npm start -- --safety-level 4 /research "Assess safeguards for a lab-adjacent study"
-```
+| Command | What it produces |
+| --- | --- |
+| `run` | Full manager-orchestrated PhD thesis workflow (calls every relevant specialist). |
+| `thesis` | A complete PhD thesis draft (title, abstract, intro, lit review, methods, results, discussion, conclusion, references). |
+| `literature-review` | A cited PhD-level literature review grouped by theme, method, evidence strength, and open questions. |
+| `abstract` | A concise thesis abstract covering problem, gap, method, evidence, contribution, and implications. |
+| `discussion` | A discussion section with implications, limitations, counterarguments, threats to validity, and future work. |
+| `experiment` | A designed-and-run experiment analyzed with Code Interpreter (stats, simulations, generated tables). |
+| `conclusion` | A conclusion synthesizing the question, contribution, evidence, limitations, and next research. |
+| `chat` | Interactive REPL — read workspace files and chat about them (see below). |
 
-Use `OPENAI_API_KEY` for live OpenAI Responses API generation. Without `OPENAI_API_KEY`, the CLI automatically uses deterministic dry-run output so the workflow still runs locally.
+### Specialists (manager tools)
 
-In interactive mode, typing any research question starts the end-to-end workflow:
+The manager calls these bounded specialist agents as tools. Each gets only the hosted tools its contract requests:
 
-```text
-ai-discovery> Can a new catalyst improve CO2 reduction yield?
-```
+| Specialist | Tool name | Hosted tools |
+| --- | --- | --- |
+| Literature Review | `generate_literature_review` | web search, File Search |
+| Abstract | `generate_abstract` | web search, File Search |
+| Discussion | `generate_discussion` | web search, File Search |
+| Experiment | `run_experiment_and_analysis` | Code Interpreter, File Search, web search |
+| Conclusion | `generate_conclusion` | web search, File Search |
+| Thesis Writer | `generate_phd_thesis` | web search, File Search |
 
-Focused commands keep the terminal in that mode. After `/hypothesis`, `/experiment`, or `/writer`, type normal follow-up text to expand, change, or rewrite that artifact and save the updated files. Use `/exit` to leave the active mode; use `/quit` to close the CLI.
+### Hosted-tool gating
 
-```text
-ai-discovery> /hypothesis Can a new catalyst improve CO2 reduction yield?
-ai-discovery:hypothesis> expand the null hypothesis and add measurement risks
-ai-discovery:hypothesis> /exit
-ai-discovery> /writer Draft the paper
-ai-discovery:writer> rewrite the conclusion more carefully
-```
+- **Web search** attaches to specialists that request it unless `--no-web-search` is set.
+- **OpenAI File Search** attaches only when at least one vector store ID is configured (`--vector-store-id`, `--vector-store-ids`, or `OPENAI_VECTOR_STORE_IDS`).
+- **Code Interpreter** attaches to the experiment specialist for quantitative analysis, simulations, statistics, and generated tables.
 
-The live literature-review stage uses the hosted Responses API web-search tool. Disable that stage's web-search tool with `--no-web-search` or `AI_DISCOVERY_DISABLE_WEB_SEARCH=1` when the prompt contains sensitive material or when hosted search is unavailable.
+### Sandboxed workspace tools
 
-Use `--safety-level <1-5>`, `AI_DISCOVERY_SAFETY_LEVEL`, or `/safety <1-5>` to set the bio/chemical risk warning profile used by the science agents. Level 1 is lowest risk, and level 5 is highest risk with the strongest warning. The setting does not lower safety boundaries or permit hazardous operational guidance.
+When workspace filesystem access is enabled (default; disable with `--no-workspace-fs`), specialists and the chat agent get local tools:
 
-## Slash Commands
+- `list_workspace` — list files/subdirectories (entries truncate at 500).
+- `read_workspace_file` — read UTF-8 text files (capped at ~256 KiB; binary files refused).
+- `write_workspace_file` — write UTF-8 text files (max 1 MiB) — **only** when `--workspace-write` is set (off by default).
 
-- `/research <question>` runs the full workflow: plan, literature review, hypothesis, experiment, experiment runner, data analysis, draft paper, technical review, final Markdown paper, and final LaTeX paper.
-- Bare text also runs `/research`.
-- `/hypothesis [question]` generates a falsifiable hypothesis package, enters hypothesis mode, and keeps follow-up text in that mode until `/exit`. In interactive mode, `/hypothesis` without a question prompts for one.
-- `/experiment [brief]` creates an experiment design, saves runnable Node.js experiment code, runs the built-in deterministic synthetic experiment runner, saves the run output, enters experiment mode, and keeps follow-up text in that mode until `/exit`.
-- `/writer [instructions]` writes a final-format paper from the current session artifacts, saves the generated Markdown and LaTeX output, enters writer mode, and keeps follow-up text in that mode until `/exit`.
-- `/model [name]` shows or changes the model used by all science agents.
-- `/safety [1-5]` shows or changes the bio/chemical risk warning level.
-- `/status` shows model, mode, output path, artifacts, and token usage.
-- `/new` starts a fresh science session.
-- `/clear` clears the terminal view and resets visible session artifacts.
-- `/history` lists completed commands.
-- `/output [directory]` shows or changes the artifact output directory.
-- `/exit` leaves the active focused mode, or exits the CLI when no focused mode is active.
-- `/quit` exits the CLI.
+All paths are resolved inside the workspace root; `..` and absolute-path escapes are rejected.
 
-## Artifacts
+### Interactive chat
 
-Each session writes files under `ai_discovery_runs/run_<timestamp>/`:
+`ai-discovery chat --workspace <path>` opens a manager-free REPL. Conversation state carries across turns, and the agent can read/list the workspace itself. Slash commands:
 
-Full `/research` workflow:
+| Command | Action |
+| --- | --- |
+| `/read <path>` | Load a workspace text file into the conversation, then ask about it. |
+| `/list [<path>]` | List workspace files (default: workspace root). |
+| `/reset` | Clear conversation history (including loaded files). |
+| `/help` | Show chat help. |
+| `/exit`, `/quit` | Leave the chat. |
 
-- `01_research_plan.md`
-- `02_literature_review.md`
-- `03_hypothesis.md`
-- `04_experiment_design.md`
-- `05_experiment_code.js`
-- `06_experiment_run.json`
-- `06_experiment_run.md`
-- `07_data_analysis.md`
-- `08_draft_paper.md`
-- `09_technical_review.md`
-- `10_final_paper.md`
-- `10_final_paper.tex`
-- `session.json`
+`/read` shares the same sandbox, 256 KiB cap, and binary guard as the agent's read tool.
 
-Single-stage commands also write their focused artifacts:
+### Streaming
 
-- `01_hypothesis.md`
-- `02_experiment_design.md`
-- `02_experiment_code.js`
-- `02_experiment_run.json`
-- `02_experiment_run.md`
-- `03_research_paper.md`
-- `03_research_paper.tex`
-- `session.json`
+Streaming is on by default (`--stream`):
 
-Research, hypothesis, and writer outputs are instructed to expose uncertainty, alternatives, provenance, counterarguments, and concise debate. Hypothesis mode also asks for claim-level evidence audits, novelty checks against prior literature, and prospective tests for selected hypotheses.
+- **stdout** — the manager's final Markdown, streamed token-by-token. This is also what gets saved to the artifact.
+- **stderr** — `[stream]` / `[specialist:<name>]` progress: output deltas plus `tool_called` / `handoff_*` / `tool_approval_requested` events.
 
-Generated experiment code is not executed automatically. The `/experiment` command and the full workflow's experiment-runner stage use deterministic synthetic data so the pipeline can proceed safely. Review generated code first, then run it in a controlled environment:
+Use `--no-stream` to wait for the complete result before printing.
+
+### Safety posture
+
+- Sensitive trace payloads are disabled everywhere (`traceIncludeSensitiveData: false`).
+- Hard citation policy: every external claim needs a real inline citation (author, year, venue, working URL/DOI) from actual search results — never fabricated. Unverifiable claims are dropped or labeled.
+- Workspace is sandboxed and writes are off by default.
+- The CLI never asks for secrets in prompts.
+
+## Setup
+
+Node >= 22 is required.
 
 ```powershell
-node .\ai_discovery_runs\<run>\05_experiment_code.js
+npm.cmd install
+npm.cmd run build
 ```
 
-## Validation
+### Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `OPENAI_API_KEY` | Required for any non-`--dry-run` invocation. |
+| `OPENAI_MODEL` | Overrides the default model (`gpt-5.5`). |
+| `OPENAI_VECTOR_STORE_IDS` | Comma-separated default vector store IDs for File Search. |
+
+## Usage
 
 ```powershell
-npm run check
+node dist/cli.js run --topic "Robust AI discovery workflows for scientific research" --workspace . --out artifacts
+node dist/cli.js literature-review --topic "AI agents for laboratory planning" --vector-store-id vs_...
+node dist/cli.js experiment --topic "Simulation-based hypothesis screening" --experiment-spec "Compare two synthetic baselines and analyze uncertainty"
+node dist/cli.js chat --workspace ./papers
 ```
 
-Dry-run smoke check:
+Run from TypeScript source without building via `npm.cmd run dev -- <command> --topic "..."`.
+
+### Options
+
+| Flag | Description |
+| --- | --- |
+| `--topic, -t <text>` | Research topic or user request (required except for `chat`). |
+| `--workspace, -w <path>` | Workspace root for the sandboxed file tools (default: cwd). |
+| `--out, -o <path>` | Output directory for the final Markdown (default: `artifacts`). |
+| `--model <model>` | Model for both manager and specialists (default: `OPENAI_MODEL` or `gpt-5.5`). |
+| `--manager-model <model>` | Override the manager model only. |
+| `--specialist-model <model>` | Override the specialist models only. |
+| `--vector-store-id <id>` | Add an OpenAI vector store for File Search; repeatable. |
+| `--vector-store-ids <ids>` | Comma-separated OpenAI vector store IDs. |
+| `--experiment-spec <text>` | Extra experiment design/analysis requirements. |
+| `--max-turns <number>` | Max manager turns (default: 24). |
+| `--no-web-search` | Disable web search tools. |
+| `--no-workspace-fs` | Disable workspace filesystem tools (read/list/write). |
+| `--workspace-write` | Allow specialists/chat to write files into the workspace (off by default). |
+| `--stream` / `--no-stream` | Stream live output (default) or wait for the final result. |
+| `--dry-run` | Print the resolved workflow as JSON without calling the API. |
+| `--help, -h` | Show usage. |
+
+Artifacts are written to `<out>/<command>-<topic-slug>.md`.
+
+### Dry run
+
+For a no-network / no-API configuration check (the only command that runs without `OPENAI_API_KEY`):
 
 ```powershell
-npm start -- --dry-run "Can a new catalyst improve CO2 reduction yield?"
-npm start -- --dry-run --safety-level 5 /hypothesis "Can a catalyst improve CO2 reduction yield?"
-npm start -- --dry-run /experiment "Design a controlled catalyst screening experiment"
-npm start -- --dry-run /writer "Draft a final-format paper from the current experiment"
+npm.cmd run dry-run
 ```
+
+This prints the resolved workflow JSON — command, models, workspace access, web-search state, vector stores, and the hosted/workspace tools each specialist would receive.

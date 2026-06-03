@@ -1,0 +1,17 @@
+AI Discovery Manager CLI
+
+Build:
+  npm.cmd install
+  npm.cmd run build
+
+Dry-run without API calls:
+  npm.cmd run dry-run
+
+Run the full manager workflow:
+  node dist/cli.js run --topic "Your PhD topic" --workspace . --out artifacts
+
+Use OpenAI File Search for every specialist:
+  node dist/cli.js run --topic "Your topic" --vector-store-id vs_...
+
+Run an experiment analysis with Code Interpreter:
+  node dist/cli.js experiment --topic "Your topic" --experiment-spec "Describe the experiment"

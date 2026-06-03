@@ -1,0 +1,27 @@
+{
+  "name": "ai-discovery-manager-cli",
+  "version": "0.1.0",
+  "description": "Codex-style research manager CLI using OpenAI Agents SDK specialist agents.",
+  "type": "module",
+  "bin": {
+    "ai-discovery": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "dry-run": "tsx src/cli.ts run --dry-run --topic \"Example thesis topic\""
+  },
+  "dependencies": {
+    "@openai/agents": "^0.11.5",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
