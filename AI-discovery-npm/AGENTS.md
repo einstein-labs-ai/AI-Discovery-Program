@@ -11,7 +11,7 @@ Node >= 22 is required. The repo is Windows-first; examples use `npm.cmd` and Po
 - `npm.cmd run dev` — run the TS source directly via `tsx src/cli.ts` (no build step).
 - `npm.cmd run dry-run` — `tsx src/cli.ts run --dry-run --topic "..."`. Prints the resolved workflow JSON without calling the OpenAI API; the only command that runs without `OPENAI_API_KEY`.
 - `node dist/cli.js <command> --topic "..."` — run a built CLI. `command` ∈ `run | thesis | literature-review | abstract | discussion | experiment | conclusion`. See `src/cli.ts` `usage()` for the full flag list.
-- `node dist/cli.js chat --workspace <path>` — interactive REPL (no `--topic` needed). Read workspace text files with `/read <path>` and chat about them; other slash commands: `/list`, `/reset`, `/help`, `/exit`. Implemented in `src/chat.ts`.
+- `node dist/cli.js chat --workspace <path>` — interactive REPL (no `--topic` needed). Read workspace text files with `/read <path>` and chat about them; other slash commands: `/list`, `/model`, `/models`, `/safety`, `/mcp`, `/reset`, `/help`, `/exit`. Implemented in `src/chat.ts`.
 - `node --check ai-discovery.js` — syntax-check the standalone JS entry point (see "Two entry points" below).
 
 There are no tests, linter, or formatter configured. Validation = `npm.cmd run build` (type check) + `npm.cmd run dry-run`.
@@ -19,8 +19,9 @@ There are no tests, linter, or formatter configured. Validation = `npm.cmd run b
 ## Environment
 
 - `OPENAI_API_KEY` — required for any non-`--dry-run` invocation.
-- `OPENAI_MODEL` — overrides the default model (`gpt-5.5`). `--model` / `--manager-model` / `--specialist-model` override per call.
+- `OPENAI_MODEL` — overrides the default model (`gpt-5.5`). `--model` / `--manager-model` / `--specialist-model` override per call. All are validated against the text-only allowlist in `src/models.ts`.
 - `OPENAI_VECTOR_STORE_IDS` — comma-separated default for `--vector-store-id`. File Search is only enabled when at least one ID is configured.
+- `AI_DISCOVERY_SAFETY_LEVEL` — default local safety preflight level `1-5` (default `3`). `--safety-level` and chat `/safety` override it.
 
 ## Architecture
 
@@ -63,6 +64,16 @@ Substantive slash-command results must remain available to the LLM for follow-up
 
 `runChat()` is a separate, manager-free path: `cli.ts` dispatches to it in `main()` when `command === "chat"` (which is why `chat` is added to `CLI_COMMANDS` and exempted from the topic requirement in `parseArgs`). It builds one chat Agent with web/file-search hosted tools plus the same `createWorkspaceTools()` and loops over stdin using **readline's async iterator** (`for await (const line of rl)`) — not sequential `rl.question()`, which silently drops buffered lines on piped input. Slash commands (`/read`, `/list`, `/reset`, `/help`, `/exit`) are handled inline; everything else is a chat turn. Conversation state is carried across turns via `result.history`. `/read` reads through the shared `readWorkspaceTextFile()` helper in `workspaceTools.ts`, so it honors the same `resolveInside` sandbox, 256 KiB cap, and binary guard as the agent's `read_workspace_file` tool — keep that helper as the single read path if you touch either.
 
+### Models, safety, and session MCP (`src/models.ts`, `src/safety.ts`, `src/mcpManager.ts`)
+
+Three focused modules back the model allowlist, safety preflight, and session MCP support. Keep their invariants:
+
+- **`src/models.ts`** is the single source of truth for the **text-only model allowlist** (`gpt-5.5`, `gpt-5.5-pro`, `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`). `resolveModel()` normalizes display aliases (`GPT-5.5 Pro`, `GPT 5.4 mini`) and throws on anything unknown. Every model input routes through it: `--model` / `--manager-model` / `--specialist-model` and `OPENAI_MODEL` in `cli.ts`, and `/model` (via `resolveModelSelector`, which also accepts a 1-based catalog index) in `chat.ts`. Don't accept raw model strings anywhere else.
+- **`src/safety.ts`** runs a **local, deterministic preflight before any API call** (and before `--dry-run` prints) so disallowed prompts fail on-device. Levels 1-5 (default 3) all block bio/chemical mass-hazard prompts; level 5 also blocks jailbreak / prompt-injection / secret-exfiltration / policy-evasion. `cli.ts` gates the topic+experiment-spec in `main()`; `chat.ts` gates each substantive turn via the `gate()` helper. This is a coarse first gate, not a replacement for the prompt-level safety instructions — keep both.
+- **`src/mcpManager.ts`** (`SessionMcpManager`) holds **session-only** stdio MCP connections via `MCPServerStdio`. There is no persisted config and no autoload. Tools are exposed to the agent prefixed by server name through `getAllMcpTools(..., { includeServerInToolNames: true })` so servers can't collide. **Env values are never printed or saved — only env key names are retained** (`envKeys`); preserve that when touching status/connect output. `chat.ts` rebuilds the agent (`buildAgent()` / `refreshMcpTools()`) whenever the model, safety level, or MCP server set changes, and calls `mcp.closeAll()` in the `finally`.
+
+Chat keyboard shortcuts (`Ctrl+S` save, `Ctrl+M` MCP status) are best-effort and TTY-only via readline `keypress` events; they no-op while a turn is running (`busy`) and are guarded so Ctrl+M doesn't fire on a plain Enter. `/mcp` is the reliable equivalent.
+
 ### Streaming model
 
 When `--stream` is on (the default), the run is split across two FDs:
@@ -77,6 +88,8 @@ When `--stream` is on (the default), the run is split across two FDs:
 - `Runner` and every specialist's `runConfig` set `traceIncludeSensitiveData: false`. Don't flip this to true without an explicit user request.
 - The manager and specialist instructions encode a **hard citation policy** (real URLs/DOIs from search results, no fabricated references, unverifiable claims must be dropped or labeled). When editing instructions, keep the "never fabricate" phrasing — the workflow's value depends on it.
 - The workspace is sandboxed *and* writes are off by default. If you broaden access (e.g. removing `resolveInside`, raising size caps, defaulting `--workspace-write` to on), call it out to the user.
+- The local safety preflight (`src/safety.ts`) runs before any network call. Don't move it after the API-key check or skip it for a command path without flagging it. The bio/chemical block applies at every level — don't relax it.
+- Session MCP is intentionally not persisted and never logs env values. Don't add an MCP config file or print env values without an explicit user request.
 
 ## Project conventions
 

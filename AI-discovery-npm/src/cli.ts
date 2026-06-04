@@ -12,6 +12,14 @@ import {
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { runChat } from "./chat.js";
+import { MODEL_IDS, resolveModel } from "./models.js";
+import {
+  describeSafetyLevel,
+  formatBlockMessage,
+  parseSafetyLevel,
+  runSafetyPreflight,
+  type SafetyLevel,
+} from "./safety.js";
 import { specialistContracts } from "./specialistContracts.js";
 import { createWorkspaceTools } from "./workspaceTools.js";
 
@@ -41,6 +49,7 @@ interface CliOptions {
   workspaceWrite: boolean;
   experimentSpec?: string;
   maxTurns: number;
+  safetyLevel: SafetyLevel;
   dryRun: boolean;
   stream: boolean;
 }
@@ -58,7 +67,7 @@ const COMMANDS = new Set<WorkflowCommand>([
 
 const CLI_COMMANDS = new Set<CliCommand>([...COMMANDS, "chat"]);
 
-const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? "gpt-5.5";
+const DEFAULT_MODEL_INPUT = process.env.OPENAI_MODEL ?? "gpt-5.5";
 
 
 
@@ -94,21 +103,31 @@ Chat slash commands (inside \`ai-discovery chat\`):
   /discussion <text>  Generate a discussion with the CLI specialist contract.
   /experiment <text>  Design/run/analyze an experiment with the CLI specialist contract.
   /conclusion <text>  Generate a conclusion with the CLI specialist contract.
+  /model [name|number] Show or switch the chat model (text-only allowlist).
+  /models             List the allowed text models.
+  /safety [1-5]       Show or set the safety level for this chat session.
+  /mcp <subcommand>   Manage session-only stdio MCP servers (connect/status/tools/disconnect/help).
   /reset              Clear the conversation history.
   /help               Show chat help.
   /exit, /quit        Leave the chat.
+
+Chat keyboard shortcuts (best-effort, TTY only):
+  Ctrl+S              Save assistant output history to a default workspace path.
+  Ctrl+M              Show MCP status/help (only where the terminal reports it distinctly).
 
 Options:
   --topic <text>                 Research topic or user request.
   --workspace <path>             Research workspace path recorded as context only (default: cwd).
   --out <path>                   Host output directory for final Markdown (default: artifacts).
   --model <model>                Model for manager and specialists (default: OPENAI_MODEL or gpt-5.5).
-  --manager-model <model>        Override manager model.
-  --specialist-model <model>     Override specialist models.
+                                 Allowed: ${MODEL_IDS.join(", ")}.
+  --manager-model <model>        Override manager model (same allowlist).
+  --specialist-model <model>     Override specialist models (same allowlist).
   --vector-store-id <id>         Add an OpenAI vector store for File Search; repeatable.
   --vector-store-ids <ids>       Comma-separated OpenAI vector store IDs.
   --experiment-spec <text>       Extra experiment design or analysis requirements.
   --max-turns <number>           Max manager turns (default: 24).
+  --safety-level <1-5>           Local safety preflight level (default: 3, env AI_DISCOVERY_SAFETY_LEVEL).
   --no-web-search               Disable web search tools.
   --no-workspace-fs             Disable workspace filesystem tools (read/list).
   --workspace-write             Allow specialists to write files into the workspace (off by default).
@@ -124,19 +143,21 @@ function parseArgs(argv: string[]): CliOptions {
   const command = CLI_COMMANDS.has(args[0] as CliCommand)
     ? (args.shift() as CliCommand)
     : "run";
+  const defaultModel = resolveModel(DEFAULT_MODEL_INPUT, "OPENAI_MODEL");
   const options: CliOptions = {
     command,
     topic: "",
     workspace: process.cwd(),
     outputDir: path.resolve(process.cwd(), "artifacts"),
-    model: DEFAULT_MODEL,
-    managerModel: DEFAULT_MODEL,
-    specialistModel: DEFAULT_MODEL,
+    model: defaultModel,
+    managerModel: defaultModel,
+    specialistModel: defaultModel,
     vectorStoreIds: parseVectorStoreIds(process.env.OPENAI_VECTOR_STORE_IDS),
     webSearch: true,
     workspaceFs: true,
     workspaceWrite: false,
     maxTurns: 24,
+    safetyLevel: parseSafetyLevel(process.env.AI_DISCOVERY_SAFETY_LEVEL),
     dryRun: false,
     stream: true,
   };
@@ -163,15 +184,21 @@ function parseArgs(argv: string[]): CliOptions {
         options.outputDir = path.resolve(readValue(args, ++i, arg));
         break;
       case "--model":
-        options.model = readValue(args, ++i, arg);
+        options.model = resolveModel(readValue(args, ++i, arg), "--model");
         options.managerModel = options.model;
         options.specialistModel = options.model;
         break;
       case "--manager-model":
-        options.managerModel = readValue(args, ++i, arg);
+        options.managerModel = resolveModel(
+          readValue(args, ++i, arg),
+          "--manager-model",
+        );
         break;
       case "--specialist-model":
-        options.specialistModel = readValue(args, ++i, arg);
+        options.specialistModel = resolveModel(
+          readValue(args, ++i, arg),
+          "--specialist-model",
+        );
         break;
       case "--vector-store-id":
         options.vectorStoreIds.push(readValue(args, ++i, arg));
@@ -189,6 +216,9 @@ function parseArgs(argv: string[]): CliOptions {
         if (!Number.isFinite(options.maxTurns) || options.maxTurns < 1) {
           throw new Error("--max-turns must be a positive integer.");
         }
+        break;
+      case "--safety-level":
+        options.safetyLevel = parseSafetyLevel(readValue(args, ++i, arg));
         break;
       case "--no-web-search":
         options.webSearch = false;
@@ -415,6 +445,10 @@ function managerInstructions(options: CliOptions): string {
     "- Aggregate all cited sources into a single 'References' section at the end of the final artifact, except for schema-only outputs like `hypothesis`, where sources must stay inside the schema fields.",
     "- If a specialist returns content with suspicious or unverifiable citations, re-invoke it with explicit instructions to re-verify via web search.",
     "",
+    "Safety:",
+    `- Active safety ${describeSafetyLevel(options.safetyLevel)}.`,
+    "- Refuse procedural wet-lab, clinical, chemical, biological, or physical-world harmful instructions regardless of level.",
+    "",
     "Available user request:",
     `Command: ${options.command}`,
     `Topic: ${options.topic}`,
@@ -491,6 +525,11 @@ function dryRunSummary(options: CliOptions): string {
         command: options.command,
         workspace: options.workspace,
         model: options.specialistModel,
+        availableModels: MODEL_IDS,
+        safetyLevel: options.safetyLevel,
+        safetyPolicy: describeSafetyLevel(options.safetyLevel),
+        mcpServers: [],
+        mcpPersistence: "session-only; no MCP config is written to disk",
         workspaceAccess: options.workspaceWrite
           ? "read+list+write via workspace tools and /read"
           : "read+list via workspace tools and /read",
@@ -508,10 +547,18 @@ function dryRunSummary(options: CliOptions): string {
           "/discussion",
           "/experiment",
           "/conclusion",
+          "/model",
+          "/models",
+          "/safety",
+          "/mcp",
           "/reset",
           "/help",
           "/exit",
         ],
+        shortcuts: {
+          "Ctrl+S": "save assistant output history to a default workspace path",
+          "Ctrl+M": "show MCP status/help (best-effort; terminal-dependent)",
+        },
       },
       null,
       2,
@@ -525,6 +572,9 @@ function dryRunSummary(options: CliOptions): string {
       outputDir: options.outputDir,
       managerModel: options.managerModel,
       specialistModel: options.specialistModel,
+      availableModels: MODEL_IDS,
+      safetyLevel: options.safetyLevel,
+      safetyPolicy: describeSafetyLevel(options.safetyLevel),
       workspaceAccess: options.workspaceFs
         ? options.workspaceWrite
           ? "read+list+write via workspace tools"
@@ -589,6 +639,17 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   await assertWorkspace(options.workspace);
 
+  // Run the local safety preflight before anything network-bound (and before
+  // the dry-run print) so disallowed prompts fail on-device. Chat has no upfront
+  // topic; its turns are gated inside runChat instead.
+  if (options.command !== "chat") {
+    const preflightText = [options.topic, options.experimentSpec ?? ""].join("\n");
+    const verdict = runSafetyPreflight(options.safetyLevel, preflightText);
+    if (!verdict.allowed) {
+      throw new Error(formatBlockMessage(verdict));
+    }
+  }
+
   if (options.dryRun) {
     process.stdout.write(`${dryRunSummary(options)}\n`);
     return;
@@ -606,6 +667,7 @@ async function main(): Promise<void> {
       webSearch: options.webSearch,
       workspaceWrite: options.workspaceWrite,
       maxTurns: options.maxTurns,
+      safetyLevel: options.safetyLevel,
       stream: options.stream,
     });
     return;
