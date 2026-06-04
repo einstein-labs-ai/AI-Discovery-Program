@@ -106,6 +106,11 @@ Chat can attach user-started **stdio MCP servers** ("science MCPs") for the curr
 /mcp help
 ```
 
+#### Example:
+```text
+/mcp connect paper-search --env PAPER_SEARCH_MCP_UNPAYWALL_EMAIL=tom.tyiu@gmail.com -- uvx --from paper-search-mcp python -m paper_search_mcp.server
+```
+
 `--env KEY` (no value) forwards `KEY` from the current environment. **Env values are never printed or saved — only key names are shown.** MCP tools are exposed to the assistant prefixed by server name so two servers cannot collide.
 
 ### Chat Output Saving
