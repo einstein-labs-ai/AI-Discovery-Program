@@ -12,7 +12,7 @@ export interface WorkspaceToolOptions {
   allowWrites: boolean;
 }
 
-function resolveInside(workspaceRoot: string, relPath: string): string {
+export function resolveInside(workspaceRoot: string, relPath: string): string {
   const cleaned = (relPath ?? "").replace(/^[/\\]+/, "");
   const resolved = path.resolve(workspaceRoot, cleaned);
   const rel = path.relative(workspaceRoot, resolved);
@@ -27,7 +27,7 @@ function resolveInside(workspaceRoot: string, relPath: string): string {
   return resolved;
 }
 
-function toPosix(p: string): string {
+export function toPosix(p: string): string {
   return p.split(path.sep).join("/");
 }
 
