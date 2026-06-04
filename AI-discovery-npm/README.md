@@ -58,7 +58,12 @@ All paths are resolved inside the workspace root; `..` and absolute-path escapes
 | --- | --- |
 | `/read <path>` | Load a workspace text file into the conversation, then ask about it. |
 | `/list [<path>]` | List workspace files (default: workspace root). |
+| `/literature-review <topic>` | Generate a literature review using the same specialist contract as the CLI workflow. |
 | `/hypothesis <question>` | Generate a structured YAML research hypothesis using the hypothesis schema. |
+| `/abstract <topic>` | Generate an abstract using the same specialist contract as the CLI workflow. |
+| `/discussion <topic>` | Generate a discussion using the same specialist contract as the CLI workflow. |
+| `/experiment <topic/spec>` | Design, run, and analyze an experiment using the same specialist contract as the CLI workflow. |
+| `/conclusion <topic>` | Generate a conclusion using the same specialist contract as the CLI workflow. |
 | `/reset` | Clear conversation history (including loaded files). |
 | `/help` | Show chat help. |
 | `/exit`, `/quit` | Leave the chat. |
