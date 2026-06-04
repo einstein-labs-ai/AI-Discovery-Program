@@ -13,6 +13,7 @@ A manager agent orchestrates specialists and produces a Markdown research artifa
 | `run` | Full manager-orchestrated PhD thesis workflow (calls every relevant specialist). |
 | `thesis` | A complete PhD thesis draft (title, abstract, intro, lit review, methods, results, discussion, conclusion, references). |
 | `literature-review` | A cited PhD-level literature review grouped by theme, method, evidence strength, and open questions. |
+| `hypothesis` | A structured YAML research hypothesis covering evidence, mechanism, predictions, test plan, confounders, feasibility, evaluation, uncertainty, and status. |
 | `abstract` | A concise thesis abstract covering problem, gap, method, evidence, contribution, and implications. |
 | `discussion` | A discussion section with implications, limitations, counterarguments, threats to validity, and future work. |
 | `experiment` | A designed-and-run experiment analyzed with Code Interpreter (stats, simulations, generated tables). |
@@ -26,6 +27,7 @@ The manager calls these bounded specialist agents as tools. Each gets only the h
 | Specialist | Tool name | Hosted tools |
 | --- | --- | --- |
 | Literature Review | `generate_literature_review` | web search, File Search |
+| Hypothesis | `generate_hypothesis` | web search, File Search |
 | Abstract | `generate_abstract` | web search, File Search |
 | Discussion | `generate_discussion` | web search, File Search |
 | Experiment | `run_experiment_and_analysis` | Code Interpreter, File Search, web search |
@@ -56,6 +58,7 @@ All paths are resolved inside the workspace root; `..` and absolute-path escapes
 | --- | --- |
 | `/read <path>` | Load a workspace text file into the conversation, then ask about it. |
 | `/list [<path>]` | List workspace files (default: workspace root). |
+| `/hypothesis <question>` | Generate a structured YAML research hypothesis using the hypothesis schema. |
 | `/reset` | Clear conversation history (including loaded files). |
 | `/help` | Show chat help. |
 | `/exit`, `/quit` | Leave the chat. |
@@ -100,6 +103,7 @@ npm.cmd run build
 ```powershell
 node dist/cli.js run --topic "Robust AI discovery workflows for scientific research" --workspace . --out artifacts
 node dist/cli.js literature-review --topic "AI agents for laboratory planning" --vector-store-id vs_...
+node dist/cli.js hypothesis --topic "Can retrieval-grounded agent debates improve hypothesis novelty screening?"
 node dist/cli.js experiment --topic "Simulation-based hypothesis screening" --experiment-spec "Compare two synthetic baselines and analyze uncertainty"
 node dist/cli.js chat --workspace ./papers
 ```
