@@ -7,11 +7,15 @@ import {
   type AgentInputItem,
   type HostedTool,
 } from "@openai/agents";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { createInterface } from "node:readline";
 import { specialistContracts } from "./specialistContracts.js";
 import {
   createWorkspaceTools,
   readWorkspaceTextFile,
+  resolveInside,
+  toPosix,
 } from "./workspaceTools.js";
 
 export interface ChatOptions {
@@ -28,10 +32,12 @@ const CHAT_HELP = [
   "Commands:",
   "  /read <path>     Load a workspace text file into the conversation, then ask about it.",
   "  /list [<path>]   List files in the workspace (default: workspace root).",
+  "  /save <path.text|path.txt|path.pdf>",
+  "                   Save assistant output history only; /flash-save is an alias.",
   "  /literature-review <topic>",
   "                   Generate a literature review using the CLI specialist contract.",
   "  /hypothesis <question>",
-   "                   Generate a structured YAML research hypothesis.",
+  "                   Generate a structured YAML research hypothesis.",
   "  /abstract <topic>",
   "                   Generate an abstract using the CLI specialist contract.",
   "  /discussion <topic>",
@@ -47,6 +53,8 @@ const CHAT_HELP = [
   "Anything else is sent to the assistant. It can also read and list workspace files on its own.",
 ].join("\n");
 const CHAT_PROMPT = "ai-discovery> ";
+const SAVE_TEXT_EXTENSIONS = new Set([".txt", ".text"]);
+const SAVE_PDF_EXTENSION = ".pdf";
 
 function chatInstructions(options: ChatOptions): string {
   return [
@@ -139,6 +147,149 @@ function buildSpecialistPrompt(command: ChatSpecialistCommand, topic: string): s
   ].join("\n");
 }
 
+function formatAssistantOutputHistory(outputs: string[]): string {
+  return outputs
+    .map((output, index) =>
+      [`--- Assistant output ${index + 1} ---`, output.trimEnd()].join("\n"),
+    )
+    .join("\n\n");
+}
+
+function escapePdfText(text: string): string {
+  return text
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "?")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function wrapPdfLine(line: string, maxChars: number): string[] {
+  const chunks: string[] = [];
+  let remaining = line;
+  while (remaining.length > maxChars) {
+    let splitAt = remaining.lastIndexOf(" ", maxChars);
+    if (splitAt < Math.floor(maxChars / 2)) {
+      splitAt = maxChars;
+    }
+    chunks.push(remaining.slice(0, splitAt).trimEnd());
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+  chunks.push(remaining);
+  return chunks;
+}
+
+function createSimplePdf(text: string): Buffer {
+  const maxCharsPerLine = 92;
+  const maxLinesPerPage = 46;
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .flatMap((line) => wrapPdfLine(line, maxCharsPerLine));
+  const pages: string[][] = [];
+  for (let i = 0; i < Math.max(lines.length, 1); i += maxLinesPerPage) {
+    pages.push(lines.slice(i, i + maxLinesPerPage));
+  }
+
+  const objects: string[] = [];
+  const addObject = (body: string): number => {
+    objects.push(body);
+    return objects.length;
+  };
+
+  const catalogId = addObject("<< /Type /Catalog /Pages 2 0 R >>");
+  const pagesId = addObject("");
+  const fontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
+  const pageIds: number[] = [];
+
+  for (const pageLines of pages) {
+    const streamLines = ["BT", "/F1 10 Tf", "50 760 Td", "12 TL"];
+    for (const line of pageLines) {
+      streamLines.push(`(${escapePdfText(line)}) Tj`, "T*");
+    }
+    streamLines.push("ET");
+    const stream = streamLines.join("\n");
+    const contentId = addObject(
+      `<< /Length ${Buffer.byteLength(stream, "ascii")} >>\nstream\n${stream}\nendstream`,
+    );
+    const pageId = addObject(
+      [
+        "<< /Type /Page",
+        `   /Parent ${pagesId} 0 R`,
+        "   /MediaBox [0 0 612 792]",
+        `   /Resources << /Font << /F1 ${fontId} 0 R >> >>`,
+        `   /Contents ${contentId} 0 R`,
+        ">>",
+      ].join("\n"),
+    );
+    pageIds.push(pageId);
+  }
+
+  objects[pagesId - 1] =
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let i = 0; i < objects.length; i += 1) {
+    offsets.push(Buffer.byteLength(pdf, "ascii"));
+    pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
+  }
+  const xrefOffset = Buffer.byteLength(pdf, "ascii");
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += "0000000000 65535 f \n";
+  for (const offset of offsets.slice(1)) {
+    pdf += `${offset.toString().padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += [
+    "trailer",
+    `<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>`,
+    "startxref",
+    String(xrefOffset),
+    "%%EOF",
+    "",
+  ].join("\n");
+  return Buffer.from(pdf, "ascii");
+}
+
+async function handleSave(
+  options: ChatOptions,
+  relPath: string,
+  assistantOutputs: string[],
+): Promise<void> {
+  if (!relPath) {
+    process.stdout.write("Usage: /save <path.text|path.txt|path.pdf>\n");
+    return;
+  }
+  if (assistantOutputs.length === 0) {
+    process.stdout.write("No assistant output history to save yet.\n");
+    return;
+  }
+
+  const extension = path.extname(relPath).toLowerCase();
+  if (!SAVE_TEXT_EXTENSIONS.has(extension) && extension !== SAVE_PDF_EXTENSION) {
+    process.stdout.write("Save path must end in .text, .txt, or .pdf.\n");
+    return;
+  }
+
+  try {
+    const target = resolveInside(options.workspace, relPath);
+    const historyText = formatAssistantOutputHistory(assistantOutputs);
+    await mkdir(path.dirname(target), { recursive: true });
+    if (extension === SAVE_PDF_EXTENSION) {
+      await writeFile(target, createSimplePdf(historyText));
+    } else {
+      await writeFile(target, historyText, "utf8");
+    }
+    const savedPath = toPosix(path.relative(options.workspace, target));
+    process.stdout.write(
+      `Saved ${assistantOutputs.length} assistant output(s) to ${savedPath}.\n`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stdout.write(`Could not save output history: ${message}\n`);
+  }
+}
+
 async function handleRead(options: ChatOptions, relPath: string): Promise<AgentInputItem | undefined> {
   if (!relPath) {
     process.stdout.write("Usage: /read <path relative to workspace>\n");
@@ -184,6 +335,7 @@ export async function runChat(options: ChatOptions): Promise<void> {
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   let thread: AgentInputItem[] = [];
+  let assistantOutputs: string[] = [];
 
   process.stdout.write("AI Discovery Chat — read files with /read and chat about them.\n");
   process.stdout.write(`${CHAT_HELP}\n\n`);
@@ -209,7 +361,25 @@ export async function runChat(options: ChatOptions): Promise<void> {
       }
       if (line === "/reset") {
         thread = [];
+        assistantOutputs = [];
         process.stdout.write("Conversation cleared.\n");
+        process.stdout.write(CHAT_PROMPT);
+        continue;
+      }
+      if (
+        line === "/save" ||
+        line.startsWith("/save ") ||
+        line === "/flash-save" ||
+        line.startsWith("/flash-save ")
+      ) {
+        const commandLength = line.startsWith("/flash-save")
+          ? "/flash-save".length
+          : "/save".length;
+        await handleSave(
+          options,
+          line.slice(commandLength).trim(),
+          assistantOutputs,
+        );
         process.stdout.write(CHAT_PROMPT);
         continue;
       }
@@ -252,19 +422,29 @@ export async function runChat(options: ChatOptions): Promise<void> {
             stream: true,
           });
           process.stdout.write("bot> ");
+          let assistantOutput = "";
           const textStream = result.toTextStream({ compatibleWithNodeStreams: true });
           for await (const chunk of textStream) {
-            process.stdout.write(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+            const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+            assistantOutput += text;
+            process.stdout.write(text);
           }
           await result.completed;
           process.stdout.write("\n");
           thread = result.history;
+          if (assistantOutput.trim()) {
+            assistantOutputs.push(assistantOutput);
+          }
         } else {
           const result = await runner.run(agent, thread, {
             maxTurns: options.maxTurns,
           });
-          process.stdout.write(`bot> ${String(result.finalOutput ?? "")}\n`);
+          const assistantOutput = String(result.finalOutput ?? "");
+          process.stdout.write(`bot> ${assistantOutput}\n`);
           thread = result.history;
+          if (assistantOutput.trim()) {
+            assistantOutputs.push(assistantOutput);
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

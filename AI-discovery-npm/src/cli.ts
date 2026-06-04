@@ -86,6 +86,7 @@ Commands:
 Chat slash commands (inside \`ai-discovery chat\`):
   /read <path>        Load a workspace text file into the conversation, then ask about it.
   /list [<path>]      List workspace files (default: workspace root).
+  /save <path>        Save assistant output history only to .text, .txt, or .pdf.
   /literature-review <text>
                       Generate a literature review with the CLI specialist contract.
   /hypothesis <text>  Generate a structured YAML research hypothesis.
@@ -499,6 +500,8 @@ function dryRunSummary(options: CliOptions): string {
         slashCommands: [
           "/read",
           "/list",
+          "/save",
+          "/flash-save",
           "/literature-review",
           "/hypothesis",
           "/abstract",

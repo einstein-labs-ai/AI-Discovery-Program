@@ -58,6 +58,7 @@ All paths are resolved inside the workspace root; `..` and absolute-path escapes
 | --- | --- |
 | `/read <path>` | Load a workspace text file into the conversation, then ask about it. |
 | `/list [<path>]` | List workspace files (default: workspace root). |
+| `/save <path.text\|path.txt\|path.pdf>` | Save assistant output history only, excluding user inputs. `/flash-save` is an alias. |
 | `/literature-review <topic>` | Generate a literature review using the same specialist contract as the CLI workflow. |
 | `/hypothesis <question>` | Generate a structured YAML research hypothesis using the hypothesis schema. |
 | `/abstract <topic>` | Generate an abstract using the same specialist contract as the CLI workflow. |
