@@ -38,7 +38,7 @@ The manager calls these bounded specialist agents as tools. Each gets only the h
 
 - **Web search** attaches to specialists that request it unless `--no-web-search` is set.
 - **OpenAI File Search** attaches only when at least one vector store ID is configured (`--vector-store-id`, `--vector-store-ids`, or `OPENAI_VECTOR_STORE_IDS`).
-- **Code Interpreter** attaches to the experiment specialist for quantitative analysis, simulations, statistics, and generated tables.
+- **Code Interpreter** attaches to the experiment specialist for quantitative analysis, simulations, statistics, and generated tables. Chat also exposes Code Interpreter so `/experiment` can use the same experiment contract.
 
 ### Sandboxed workspace tools
 
@@ -48,11 +48,13 @@ When workspace filesystem access is enabled (default; disable with `--no-workspa
 - `read_workspace_file` — read UTF-8 text files (capped at ~256 KiB; binary files refused).
 - `write_workspace_file` — write UTF-8 text files (max 1 MiB) — **only** when `--workspace-write` is set (off by default).
 
-All paths are resolved inside the workspace root; `..` and absolute-path escapes are rejected.
+All tool paths are resolved inside the workspace root; `..` and absolute-path escapes are rejected. Chat `/save` and `/flash-save` are host-side export commands, not model tools, and also constrain output paths inside the workspace.
 
 ### Interactive chat
 
-`ai-discovery chat --workspace <path>` opens a manager-free REPL. Conversation state carries across turns, and the agent can read/list the workspace itself. Slash commands:
+`ai-discovery chat --workspace <path>` opens a manager-free REPL. Conversation state carries across turns, and the agent can read/list the workspace itself. Specialist slash commands reuse the same shared specialist contracts as the manager CLI, so chat and workflow output stay aligned.
+
+Slash commands:
 
 | Command | Action |
 | --- | --- |
@@ -65,11 +67,25 @@ All paths are resolved inside the workspace root; `..` and absolute-path escapes
 | `/discussion <topic>` | Generate a discussion using the same specialist contract as the CLI workflow. |
 | `/experiment <topic/spec>` | Design, run, and analyze an experiment using the same specialist contract as the CLI workflow. |
 | `/conclusion <topic>` | Generate a conclusion using the same specialist contract as the CLI workflow. |
-| `/reset` | Clear conversation history (including loaded files). |
+| `/reset` | Clear conversation history, loaded files, and assistant output history used by `/save`. |
 | `/help` | Show chat help. |
 | `/exit`, `/quit` | Leave the chat. |
 
 `/read` shares the same sandbox, 256 KiB cap, and binary guard as the agent's read tool.
+
+### Chat Output Saving
+
+Use `/save <path>` or `/flash-save <path>` inside `ai-discovery chat` to export only assistant output from the current chat session. User prompts, slash commands, and loaded file contents are not written to the export. Text exports support `.text` and `.txt`; PDF exports support `.pdf` and are converted from the plain text history.
+
+Examples:
+
+```text
+/save notes/session-output.text
+/save notes/session-output.pdf
+/flash-save latest-output.txt
+```
+
+Saved text groups replies as `--- Assistant output N ---`. Export paths must stay inside the configured workspace.
 
 ### Streaming
 
@@ -112,6 +128,18 @@ node dist/cli.js literature-review --topic "AI agents for laboratory planning" -
 node dist/cli.js hypothesis --topic "Can retrieval-grounded agent debates improve hypothesis novelty screening?"
 node dist/cli.js experiment --topic "Simulation-based hypothesis screening" --experiment-spec "Compare two synthetic baselines and analyze uncertainty"
 node dist/cli.js chat --workspace ./papers
+```
+
+Example chat commands:
+
+```text
+/literature-review AI agents for laboratory planning
+/hypothesis Can retrieval-grounded agent debates improve novelty screening?
+/abstract Robust AI discovery workflows for scientific research
+/discussion Limitations and counterarguments for AI co-scientist systems
+/experiment Compare two synthetic baselines and analyze uncertainty
+/conclusion AI agents for scientific discovery
+/save outputs/session-output.pdf
 ```
 
 Run from TypeScript source without building via `npm.cmd run dev -- <command> --topic "..."`.
