@@ -2,7 +2,7 @@
 
 Codex-style research CLI built on the OpenAI Agents SDK **manager pattern**: one trusted host agent owns the final answer and calls bounded specialist agents exposed as tools. The host process owns local filesystem writes for generated artifacts, chat exports, and optional workspace writes.
 
-#Installation
+## Installation
 How to install the AI Discovery Manager CLI
 ```text
 npm i ai-discovery-manager-cli
