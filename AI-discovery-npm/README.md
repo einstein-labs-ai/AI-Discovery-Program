@@ -1,6 +1,13 @@
-﻿# AI Discovery Manager CLI
+# AI Discovery Manager CLI
 
 Codex-style research CLI built on the OpenAI Agents SDK **manager pattern**: one trusted host agent owns the final answer and calls bounded specialist agents exposed as tools. The host process owns local filesystem writes for generated artifacts, chat exports, and optional workspace writes.
+
+#Installation
+How to install the AI Discovery Manager CLI
+```text
+npm i ai-discovery-manager-cli
+```
+
 
 ## Features
 
@@ -19,6 +26,7 @@ A manager agent orchestrates specialists and produces a Markdown research artifa
 | `experiment` | A designed-and-run experiment analyzed with Code Interpreter (stats, simulations, generated tables). |
 | `conclusion` | A conclusion synthesizing the question, contribution, evidence, limitations, and next research. |
 | `chat` | Interactive REPL for workspace Q&A, specialist slash commands, and assistant-output exports. |
+| `doctor` | Local readiness checks for API key, workspace, models, vector stores, MCP support, and built dist files. |
 
 ### Specialists (manager tools)
 
@@ -50,6 +58,8 @@ When workspace filesystem access is enabled (default; disable with `--no-workspa
 
 All tool paths are resolved inside the workspace root; `..` and absolute-path escapes are rejected. Chat `/save` and `/flash-save` are host-side export commands, not model tools, and also constrain output paths inside the workspace.
 
+Model-facing workspace reads also refuse default ignored paths such as `.env*`, `.git`, `node_modules`, lockfiles, and secret/key-like filenames before file content is sent to the model.
+
 ### Interactive chat
 
 `ai-discovery chat --workspace <path>` opens a manager-free REPL. Conversation state carries across turns, and the agent can read/list the workspace itself. Specialist slash commands reuse the same shared specialist contracts as the manager CLI, so chat and workflow output stay aligned.
@@ -71,6 +81,7 @@ Slash commands:
 | `/models` | List the allowed text models. |
 | `/safety [1-5]` | Show or set the local safety preflight level for the session. |
 | `/mcp <subcommand>` | Manage session-only stdio MCP servers (`connect` / `status` / `tools` / `disconnect` / `help`). |
+| `/recursive [on\|off\|status\|<iterations>]` | Toggle bounded self-review/revision for subsequent assistant replies. |
 | `/reset` | Clear conversation history, loaded files, and assistant output history used by `/save`. |
 | `/help` | Show chat help. |
 | `/exit`, `/quit` | Leave the chat. |
@@ -104,11 +115,6 @@ Chat can attach user-started **stdio MCP servers** ("science MCPs") for the curr
 /mcp tools [name]
 /mcp disconnect <name>
 /mcp help
-```
-
-#### Example:
-```text
-/mcp connect paper-search --env PAPER_SEARCH_MCP_UNPAYWALL_EMAIL=tom.tyiu@gmail.com -- uvx --from paper-search-mcp python -m paper_search_mcp.server
 ```
 
 `--env KEY` (no value) forwards `KEY` from the current environment. **Env values are never printed or saved — only key names are shown.** MCP tools are exposed to the assistant prefixed by server name so two servers cannot collide.
@@ -166,12 +172,14 @@ npm.cmd run build
 ## Usage
 
 ```powershell
-node dist/cli.js run --topic "Robust AI discovery workflows for scientific research" --workspace . --out artifacts
-node dist/cli.js literature-review --topic "AI agents for laboratory planning" --vector-store-id vs_...
-node dist/cli.js hypothesis --topic "Can retrieval-grounded agent debates improve hypothesis novelty screening?"
-node dist/cli.js experiment --topic "Simulation-based hypothesis screening" --experiment-spec "Compare two synthetic baselines and analyze uncertainty"
-node dist/cli.js run --topic "..." --manager-model "GPT-5.5 Pro" --specialist-model gpt-5.4-mini --safety-level 5
-node dist/cli.js chat --workspace ./papers --safety-level 4
+ai-discovery run --topic "Robust AI discovery workflows for scientific research" --workspace . --out artifacts
+ai-discovery literature-review --topic "AI agents for laboratory planning" --vector-store-id vs_...
+ai-discovery hypothesis --topic "Can retrieval-grounded agent debates improve hypothesis novelty screening?"
+ai-discovery experiment --topic "Simulation-based hypothesis screening" --experiment-spec "Compare two synthetic baselines and analyze uncertainty"
+ai-discovery run --topic "..." --manager-model "GPT-5.5 Pro" --specialist-model gpt-5.4-mini --safety-level 5
+ai-discovery chat --workspace ./papers --safety-level 4
+ai-discovery doctor --workspace . --json
+ai-discovery run --resume <run-id>
 ```
 
 Example chat commands:
@@ -188,6 +196,7 @@ Example chat commands:
 /safety 5
 /mcp connect arxiv --env ARXIV_TOKEN -- npx -y @example/arxiv-mcp-server
 /mcp tools arxiv
+/recursive on 3
 /save outputs/session-output.pdf
 ```
 
@@ -213,6 +222,8 @@ Run from TypeScript source without building via `npm.cmd run dev -- <command> --
 | `--workspace-write` | Allow specialists/chat to write files into the workspace (off by default). |
 | `--stream` / `--no-stream` | Stream live output (default) or wait for the final result. |
 | `--dry-run` | Print the resolved workflow as JSON without calling the API. |
+| `--json` | Emit machine-readable JSON. Live run/chat output is newline-delimited JSON events. |
+| `--resume <id>` | Resume a saved workflow checkpoint from `.ai-discovery/runs/<id>`. |
 | `--help, -h` | Show usage. |
 
 Artifacts are written to `<out>/<command>-<topic-slug>.md`.
@@ -226,3 +237,23 @@ npm.cmd run dry-run
 ```
 
 This prints the resolved workflow JSON — command, models, the text-only `availableModels` allowlist, `safetyLevel`/`safetyPolicy`, workspace access, web-search state, vector stores, and the hosted/workspace tools each specialist would receive. The `chat` dry-run additionally lists the slash commands, keyboard shortcuts, and `mcpServers` (session-only).
+
+### JSON, doctor, and resumable runs
+
+Use `--json` when another agent or script needs stable machine-readable output:
+
+```powershell
+ai-discovery doctor --workspace . --json
+ai-discovery run --topic "..." --json
+ai-discovery chat --workspace . --json
+```
+
+Live workflow and chat commands emit newline-delimited JSON events such as `run_started`, `manager_output_delta`, `artifact_written`, `run_completed`, `chat_started`, `assistant_output_delta`, `assistant_output`, and `error`. Completion events include artifact paths, checkpoint paths, citations found in the final text, SDK token usage when reported, and a cost object with `amount: null` because model-specific pricing is not bundled.
+
+Every non-chat workflow creates a checkpoint under `.ai-discovery/runs/<id>/` with `options.json`, `prompt.md`, `partial.md`, `final.md`, `metadata.json`, and `result.json`. Pressing Ctrl+C during a streamed run saves the current partial before exiting. Resume with:
+
+```powershell
+ai-discovery run --resume <id>
+```
+
+`doctor` does not call the OpenAI API. It checks local Node version, API-key presence, workspace existence/writability, model allowlist values, vector-store ID shape, MCP stdio availability, and whether the `ai-discovery` command target exists.
